@@ -168,11 +168,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="section">
       <div class="section-title">Description of Work</div>
       <textarea id="f-desc" rows="4" placeholder="Describe the work preformed..."></textarea>
-      <label class="checkbox-row" style="margin-top:10px;margin-bottom:8px">
-        <div class="checkbox" id="ai-friendly-check" onclick="toggleAiFriendly()"></div>
-        <span style="color:#1d1d1f;font-size:14px">Customer-friendly language</span>
-      </label>
-      <button type="button" class="btn-add" id="ai-polish-btn" onclick="polishDescription()">✨ AI Polish</button>
+      <button type="button" class="btn-add" id="ai-polish-btn" onclick="polishDescription()" style="margin-top:10px">✨ AI Polish</button>
     </div>
 
     <div class="section">
@@ -213,6 +209,7 @@ textarea{resize:vertical;line-height:1.6}
         <option value="5">5 vehicles</option>
       </select>
       <div style="font-size:11px;color:#86868b;margin-top:6px">$0.75/mile · mileage calculated by office</div>
+      <div id="mileage-ref" style="font-size:12px;color:#86868b;margin-top:8px"></div>
     </div>
 
     <div class="section">
@@ -271,14 +268,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 let descriptionBeforePolish = null;
 
-let aiFriendlyMode = false;
-
-function toggleAiFriendly() {
-  aiFriendlyMode = !aiFriendlyMode;
-  const check = document.getElementById('ai-friendly-check');
-  check.className = 'checkbox' + (aiFriendlyMode ? ' checked' : '');
-}
-
 function gatherJobContext() {
   const matNames = materials
     .filter(m => m.desc && m.desc.trim())
@@ -325,8 +314,7 @@ async function polishDescription() {
       },
       body: JSON.stringify({
         notes: raw,
-        context: gatherJobContext(),
-        friendly: aiFriendlyMode
+        context: gatherJobContext()
       })
     });
     if (!res.ok) {
@@ -428,7 +416,11 @@ async function loadCloudData() {
 
     // Load properties
     const props = await sbFetch('properties?order=name.asc');
-    if (props && props.length) properties = props.map(p => p.name);
+    if (props && props.length) {
+      properties = props.map(p => p.name);
+      props.forEach(p => { if (p.mileage) mileageDB[p.name] = p.mileage; });
+      saveMileageDB();
+    }
 
     // Load technicians
     const techs = await sbFetch('technicians?order=name.asc');
@@ -623,8 +615,55 @@ function populateDropdowns() {
     technicians.map(t => `<option value="${t}"${t===defaultTech?' selected':''}>${t}</option>`).join('');
 }
 
-function handleParkChange(val) { /* just use the selected value */ }
+function handleParkChange(val) {
+  showMileage(val);
+}
 function handleTechChange(val) { /* just use the selected value */ }
+
+// ── MILEAGE (manual entry, remembered per property) ───────
+let mileageDB = {};
+try { mileageDB = JSON.parse(localStorage.getItem('mileageDB') || '{}'); } catch(e){}
+
+function saveMileageDB() {
+  try { localStorage.setItem('mileageDB', JSON.stringify(mileageDB)); } catch(e){}
+}
+
+async function saveMileageToCloud(property, miles) {
+  await fetch(SUPABASE_URL + '/rest/v1/properties?name=eq.' + encodeURIComponent(property), {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify({ mileage: miles })
+  });
+}
+
+function showMileage(property) {
+  const refEl = document.getElementById('mileage-ref');
+  if (!refEl) return;
+  if (!property) { refEl.innerHTML = ''; return; }
+
+  const known = mileageDB[property];
+  if (known) {
+    refEl.innerHTML = `📍 ~${known} miles from shop (one-way) <button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px">edit</button>`;
+  } else {
+    refEl.innerHTML = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0">+ Add mileage for this property</button>`;
+  }
+}
+
+function editMileage(property) {
+  showModal('Mileage to ' + property, 'Miles from shop (one-way)', null, (val) => {
+    const trimmed = val.trim().replace(/[^0-9.]/g, '');
+    if (!trimmed) return;
+    mileageDB[property] = trimmed;
+    saveMileageDB();
+    saveMileageToCloud(property, trimmed);
+    showMileage(property);
+  });
+}
 
 // ── MODAL DIALOG ──────────────────────────────────────────
 let modalCallback = null;
@@ -670,7 +709,7 @@ function addNewPark() {
       saveProperties();
     }
     populateDropdowns();
-    setTimeout(() => { document.getElementById('f-park').value = trimmed; }, 50);
+    setTimeout(() => { document.getElementById('f-park').value = trimmed; showMileage(trimmed); }, 50);
   });
 }
 
@@ -1208,14 +1247,13 @@ function resetForm() {
   document.getElementById('f-date').value = '';
   document.getElementById('f-by').value = '';
   document.getElementById('f-park').value = '';
+  const mileageRefEl = document.getElementById('mileage-ref');
+  if (mileageRefEl) mileageRefEl.innerHTML = '';
   document.getElementById('f-space').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notes').value = '';
   document.getElementById('f-vehicles').value = '0';
   descriptionBeforePolish = null;
-  aiFriendlyMode = false;
-  const friendlyCheck = document.getElementById('ai-friendly-check');
-  if (friendlyCheck) friendlyCheck.className = 'checkbox';
   const undoBtn = document.getElementById('ai-undo-btn');
   if (undoBtn) undoBtn.style.display = 'none';
   materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
