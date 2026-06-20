@@ -167,7 +167,7 @@ textarea{resize:vertical;line-height:1.6}
 
     <div class="section">
       <div class="section-title">Description of Work</div>
-      <textarea id="f-desc" rows="4" placeholder="Describe the work to be done..."></textarea>
+      <textarea id="f-desc" rows="4" placeholder="Describe the work preformed..."></textarea>
     </div>
 
     <div class="section">
@@ -187,6 +187,12 @@ textarea{resize:vertical;line-height:1.6}
     </div>
 
     <div class="section">
+      <div class="section-title">Technicians Assistant</div>
+      <div id="assist-list"></div>
+      <button class="btn-add" onclick="addLabor('assist')">+ Add Technicians Assistant</button>
+    </div>
+
+    <div class="section">
       <div class="section-title">Laborer</div>
       <div id="labor-list"></div>
       <button class="btn-add" onclick="addLabor('labor')">+ Add Laborer</button>
@@ -196,8 +202,8 @@ textarea{resize:vertical;line-height:1.6}
       <div class="section-title">Fuel Surcharge</div>
       <label class="field-label">Number of Vehicles</label>
       <select id="f-vehicles">
-        <option value="0">0 vehicles</option>
-        <option value="1" selected>1 vehicle</option><option value="2">2 vehicles</option>
+        <option value="0" selected>0 vehicles</option>
+        <option value="1">1 vehicle</option><option value="2">2 vehicles</option>
         <option value="3">3 vehicles</option><option value="4">4 vehicles</option>
         <option value="5">5 vehicles</option>
       </select>
@@ -293,6 +299,7 @@ async function loadCloudData() {
         description: o.description,
         materials: o.materials || [],
         techLabor: o.tech_labor || [],
+        techAssist: o.tech_assist || [],
         laborers: o.laborers || [],
         fuelVehicles: o.fuel_vehicles,
         status: o.status,
@@ -367,6 +374,7 @@ async function saveOrderToCloud(order) {
       description: order.description,
       materials: order.materials,
       tech_labor: order.techLabor,
+      tech_assist: order.techAssist,
       laborers: order.laborers,
       fuel_vehicles: order.fuelVehicles,
       status: order.status,
@@ -439,8 +447,9 @@ async function saveTechToCloud(name) {
 let orders = [];
 let currentStatus = '';
 let materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
-let techLabor = [{rate:'',hours:'',type:'RT'}];
-let laborers = [{rate:'',hours:'',type:'RT'}];
+let techLabor = [{rate:'225',hours:'',type:'RT'}];
+let techAssist = [{rate:'150',hours:'',type:'RT'}];
+let laborers = [{rate:'150',hours:'',type:'RT'}];
 let currentOrderId = null;
 let touchStartX = null;
 let swipedCardId = null;
@@ -459,8 +468,9 @@ function fmtDate(d) {
 function calcTotal() {
   const mat = materials.reduce((s,m) => s + (parseFloat(m.qty)||1)*(parseFloat(m.cost)||0), 0);
   const tech = techLabor.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
+  const assist = techAssist.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const lab = laborers.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
-  return mat + tech + lab;
+  return mat + tech + assist + lab;
 }
 
 function updateTotal() {
@@ -853,6 +863,7 @@ function showManageMaterials(rowIndex) {
 function closeManageMaterials() {
   document.getElementById('manage-mat-overlay').style.display = 'none';
   renderMaterials();
+  renderLabor();
 }
 
 function deleteMaterial(name, rowIndex) {
@@ -932,18 +943,41 @@ function removeMaterial(i) {
 }
 
 // ── LABOR ─────────────────────────────────────────────────
+const LABOR_ARRAYS = { tech: () => techLabor, assist: () => techAssist, labor: () => laborers };
+const LABOR_DEFAULT_RATE = { tech: '225', assist: '150', labor: '150' };
+
+let rateOptions = { tech: ['225'], assist: ['150'], labor: ['150'] };
+try {
+  const saved = JSON.parse(localStorage.getItem('rateOptions') || 'null');
+  if (saved) rateOptions = saved;
+} catch(e){}
+
+function saveRateOptions() {
+  try { localStorage.setItem('rateOptions', JSON.stringify(rateOptions)); } catch(e){}
+}
+
 function renderLabor() {
-  ['tech','labor'].forEach(type => {
-    const arr = type === 'tech' ? techLabor : laborers;
+  ['tech','assist','labor'].forEach(type => {
+    const arr = LABOR_ARRAYS[type]();
     const el = document.getElementById(type + '-list');
+    if (!el) return;
     el.innerHTML = '';
+    const rates = rateOptions[type] || [];
     arr.forEach((r,i) => {
+      const rateOpts = rates.map(rt =>
+        `<option value="${rt}"${String(r.rate)===String(rt)?' selected':''}>$${rt}/hr</option>`
+      ).join('');
       const row = document.createElement('div');
       row.className = 'labor-row';
       row.innerHTML = `
-        <input type="text" placeholder="Rate $" value="${r.rate||''}" oninput="${type==='tech'?'techLabor':'laborers'}[${i}].rate=this.value;updateTotal()"/>
+        <select onchange="pickRate('${type}',${i},this.value)" style="width:100px;background:#fff;border:1px solid #d2d2d7;border-radius:8px;padding:10px 8px;color:#1d1d1f;font-size:14px;outline:none;-webkit-appearance:auto">
+          <option value="">Rate $</option>
+          ${rateOpts}
+          <option value="__add__">＋ Add rate</option>
+          <option value="__manage__">🗑 Manage Rates</option>
+        </select>
         <span style="color:#86868b">×</span>
-        <input type="text" placeholder="Hrs" value="${r.hours||''}" oninput="${type==='tech'?'techLabor':'laborers'}[${i}].hours=this.value;updateTotal()"/>
+        <input type="text" placeholder="Hrs" value="${r.hours||''}" oninput="${type==='tech'?'techLabor':type==='assist'?'techAssist':'laborers'}[${i}].hours=this.value;updateTotal()"/>
         <button class="type-btn ${r.type==='RT'?'active-rt':''}" onclick="setType('${type}',${i},'RT')">RT</button>
         <button class="type-btn ${r.type==='OT'?'active-ot':''}" onclick="setType('${type}',${i},'OT')">OT</button>
         ${arr.length > 1 ? `<button class="btn-remove" onclick="removeLabor('${type}',${i})">×</button>` : ''}
@@ -953,21 +987,70 @@ function renderLabor() {
   });
 }
 
+function pickRate(type, i, val) {
+  const arr = LABOR_ARRAYS[type]();
+  if (val === '__add__') {
+    showModal('Add Rate', 'Rate amount (e.g. 175)', null, (name) => {
+      const trimmed = name.trim().replace(/[^0-9.]/g, '');
+      if (trimmed && !rateOptions[type].includes(trimmed)) {
+        rateOptions[type].push(trimmed);
+        rateOptions[type].sort((a,b) => parseFloat(a) - parseFloat(b));
+        saveRateOptions();
+      }
+      arr[i].rate = trimmed;
+      updateTotal();
+      renderLabor();
+    });
+    return;
+  }
+  if (val === '__manage__') {
+    showManageRates(type, i);
+    renderLabor();
+    return;
+  }
+  arr[i].rate = val;
+  updateTotal();
+  renderLabor();
+}
+
+function showManageRates(type, rowIndex) {
+  const list = document.getElementById('manage-mat-list');
+  const rates = rateOptions[type] || [];
+  if (!rates.length) {
+    list.innerHTML = '<div style="text-align:center;color:#86868b;padding:20px;font-size:14px">No saved rates yet.</div>';
+  } else {
+    list.innerHTML = rates.map(rt => `
+      <div class="manage-mat-row">
+        <div class="manage-mat-info">
+          <div class="manage-mat-name">$${rt}/hr</div>
+        </div>
+        <button class="manage-mat-delete" onclick="deleteRate('${type}','${rt}',${rowIndex})">Delete</button>
+      </div>
+    `).join('');
+  }
+  document.getElementById('manage-mat-overlay').style.display = 'flex';
+}
+
+function deleteRate(type, rate, rowIndex) {
+  if (!confirm(`Delete the $${rate}/hr rate option? This cannot be undone.`)) return;
+  rateOptions[type] = rateOptions[type].filter(r => r !== rate);
+  saveRateOptions();
+  showManageRates(type, rowIndex);
+}
+
 function addLabor(type) {
-  if (type === 'tech') techLabor.push({rate:'',hours:'',type:'RT'});
-  else laborers.push({rate:'',hours:'',type:'RT'});
+  const arr = LABOR_ARRAYS[type]();
+  arr.push({rate: LABOR_DEFAULT_RATE[type], hours:'', type:'RT'});
   renderLabor();
 }
 
 function removeLabor(type, i) {
-  if (type === 'tech') techLabor.splice(i,1);
-  else laborers.splice(i,1);
+  LABOR_ARRAYS[type]().splice(i,1);
   renderLabor();
 }
 
 function setType(type, i, t) {
-  if (type === 'tech') techLabor[i].type = t;
-  else laborers[i].type = t;
+  LABOR_ARRAYS[type]()[i].type = t;
   renderLabor();
 }
 
@@ -994,6 +1077,7 @@ function saveOrder() {
     description: document.getElementById('f-desc').value,
     materials: materials.map(m=>({...m})),
     techLabor: techLabor.map(r=>({...r})),
+    techAssist: techAssist.map(r=>({...r})),
     laborers: laborers.map(r=>({...r})),
     fuelVehicles: document.getElementById('f-vehicles').value,
     status: currentStatus,
@@ -1015,10 +1099,11 @@ function resetForm() {
   document.getElementById('f-space').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notes').value = '';
-  document.getElementById('f-vehicles').value = '1';
+  document.getElementById('f-vehicles').value = '0';
   materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
-  techLabor = [{rate:'',hours:'',type:'RT'}];
-  laborers = [{rate:'',hours:'',type:'RT'}];
+  techLabor = [{rate:'225',hours:'',type:'RT'}];
+  techAssist = [{rate:'150',hours:'',type:'RT'}];
+  laborers = [{rate:'150',hours:'',type:'RT'}];
   currentStatus = '';
   document.getElementById('btn-complete').className = 'status-btn';
   document.getElementById('btn-inprogress').className = 'status-btn';
@@ -1054,6 +1139,7 @@ function showDetail(id) {
   const el = document.getElementById('detail-content');
   const matLines = o.materials.filter(m=>m.desc||m.cost).map(m=>`<div class="detail-row"><span class="detail-label">${m.desc||'—'} × ${m.qty||1}</span><span class="detail-value">$${((parseFloat(m.qty)||1)*(parseFloat(m.cost)||0)).toFixed(2)}</span></div>`).join('');
   const techLines = o.techLabor.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
+  const assistLines = (o.techAssist||[]).filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
   const labLines = o.laborers.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
 
   el.innerHTML = `
@@ -1064,6 +1150,7 @@ function showDetail(id) {
     ${o.description?`<div class="detail-card"><div class="detail-card-title">Description</div><div class="detail-card-text">${o.description}</div></div>`:''}
     ${matLines?`<div class="detail-card"><div class="detail-card-title">Materials</div>${matLines}</div>`:''}
     ${techLines?`<div class="detail-card"><div class="detail-card-title">Technical Labor</div>${techLines}</div>`:''}
+    ${assistLines?`<div class="detail-card"><div class="detail-card-title">Technicians Assistant</div>${assistLines}</div>`:''}
     ${labLines?`<div class="detail-card"><div class="detail-card-title">Laborer</div>${labLines}</div>`:''}
     <div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${o.fuelVehicles||1} vehicle(s)</span><span class="detail-value" style="color:#86868b">$0.75/mile – office calculates</span></div></div>
     ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${o.otherNotes}</div></div>`:''}
@@ -1171,6 +1258,7 @@ function sendOrder(id) {
 function buildPlainEmail(o) {
   const matTotal = o.materials.reduce((s,m)=>s+(parseFloat(m.qty)||1)*(parseFloat(m.cost)||0),0);
   const techRows = o.techLabor.filter(r=>r.rate||r.hours);
+  const assistRows = (o.techAssist||[]).filter(r=>r.rate||r.hours);
   const labRows  = o.laborers.filter(r=>r.rate||r.hours);
   const matRows  = o.materials.filter(m=>m.desc||m.cost);
   let b = '';
@@ -1204,6 +1292,14 @@ function buildPlainEmail(o) {
     });
   }
 
+  if (assistRows.length) {
+    b += `\n${'─'.repeat(40)}\nTECHNICIANS ASSISTANT\n\n`;
+    assistRows.forEach(r => {
+      const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
+      b += `$${r.rate||0}/hr  ×  ${r.hours||0} hrs  [${r.type}]  =  $${sub}\n`;
+    });
+  }
+
   if (labRows.length) {
     b += `\n${'─'.repeat(40)}\nLABORER\n\n`;
     labRows.forEach(r => {
@@ -1230,6 +1326,7 @@ function buildPlainEmail(o) {
 function buildHtmlEmail(o) {
   const matTotal = o.materials.reduce((s,m)=>s+(parseFloat(m.qty)||1)*(parseFloat(m.cost)||0),0);
   const techRows = o.techLabor.filter(r=>r.rate||r.hours);
+  const assistRows = (o.techAssist||[]).filter(r=>r.rate||r.hours);
   const labRows  = o.laborers.filter(r=>r.rate||r.hours);
   const matRows  = o.materials.filter(m=>m.desc||m.cost);
   const statusColor = o.status==='Complete'?'#22c55e':o.status==='In Progress'?'#f59e0b':'#86868b';
@@ -1275,6 +1372,17 @@ function buildHtmlEmail(o) {
     </div>`;
   }).join('');
   const techSection = techRows.length ? card('Technical Labor', techContent) : '';
+
+  // Technicians Assistant
+  let assistContent = assistRows.map(r => {
+    const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
+    const typeColor = r.type==='RT'?'#05befe':'#f59e0b';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">
+      <span style="color:#1d1d1f;font-size:14px;">$${r.rate||0}/hr &times; ${r.hours||0} hrs</span>
+      <span style="color:${typeColor};font-size:14px;font-weight:600;">${r.type} &middot; $${sub}</span>
+    </div>`;
+  }).join('');
+  const assistSection = assistRows.length ? card('Technicians Assistant', assistContent) : '';
 
   // Laborer
   let labContent = labRows.map(r => {
@@ -1335,6 +1443,7 @@ function buildHtmlEmail(o) {
       ${descSection}
       ${matSection}
       ${techSection}
+      ${assistSection}
       ${labSection}
       ${fuelSection}
       ${notesSection}
@@ -1354,6 +1463,7 @@ function buildEmailBody(o) {
   const line = '________________________________';
   const matTotal = o.materials.reduce((s,m)=>s+(parseFloat(m.qty)||1)*(parseFloat(m.cost)||0),0);
   const techRows = o.techLabor.filter(r=>r.rate||r.hours);
+  const assistRows = (o.techAssist||[]).filter(r=>r.rate||r.hours);
   const labRows = o.laborers.filter(r=>r.rate||r.hours);
   const matRows = o.materials.filter(m=>m.desc||m.cost);
 
@@ -1397,6 +1507,18 @@ TECHNICAL LABOR
 
 `;
     techRows.forEach(r => {
+      const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
+      body += `$${r.rate||0}/hr  ×  ${r.hours||0} hrs  [${r.type}]          $${sub}\n`;
+    });
+    body += '\n';
+  }
+
+  if (assistRows.length) {
+    body += `${line}
+TECHNICIANS ASSISTANT
+
+`;
+    assistRows.forEach(r => {
       const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
       body += `$${r.rate||0}/hr  ×  ${r.hours||0} hrs  [${r.type}]          $${sub}\n`;
     });
