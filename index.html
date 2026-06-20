@@ -327,7 +327,7 @@ async function loadCloudData() {
     // Load categories
     const cats = await sbFetch('categories?order=id.asc');
     if (cats && cats.length) {
-      categoryList = cats.map(c => c.name);
+      categoryList = cats.map(c => c.name).sort((a,b) => a.localeCompare(b));
       saveCategoryList();
     }
 
@@ -596,10 +596,8 @@ try {
   });
 } catch(e){}
 
-let categoryList = ["Conduit", "RMC", "LFMC", "EMT", "FMC", "PVC", "Conduit Body",
-  "Conductor", "Circuit Breaker",
-  "Splice", "Lug", "Grounding", "Receptacle", "Metering", "Pedestal", "Lighting",
-  "Hardware", "Chemical"];
+let categoryList = ["Chemical", "Circuit Breaker", "Conductor", "Conduit", "Fitting",
+  "Grounding", "Hardware", "Lighting", "Lug", "Metering", "Pedestal", "Receptacle", "Splice"];
 try {
   const savedCats = JSON.parse(localStorage.getItem('categoryList') || 'null');
   if (savedCats && savedCats.length) categoryList = savedCats;
@@ -723,6 +721,11 @@ function getMaterialsByCategoryAndManufacturer(category, manufacturer) {
     .sort(naturalSizeSort);
 }
 
+function subFilterLabel(category) {
+  if (category === 'Conduit' || category === 'Fitting') return 'Type';
+  return 'Manufacturer';
+}
+
 function renderMaterials() {
   const el = document.getElementById('materials-list');
   el.innerHTML = '';
@@ -735,11 +738,12 @@ function renderMaterials() {
 
     const hasMfrs = currentCat ? categoryHasManufacturers(currentCat) : false;
     const mfrList = hasMfrs ? getManufacturersForCategory(currentCat) : [];
+    const subLabel = subFilterLabel(currentCat);
     const mfrOptions = mfrList.map(mf =>
       `<option value="${mf}"${mf===currentMfr?' selected':''}>${mf}</option>`
     ).join('');
 
-    // Materials only show once category (and manufacturer, if applicable) is chosen
+    // Materials only show once category (and sub-filter, if applicable) is chosen
     const readyForMaterial = currentCat && (!hasMfrs || currentMfr);
     const matNames = readyForMaterial
       ? (hasMfrs ? getMaterialsByCategoryAndManufacturer(currentCat, currentMfr) : getMaterialsByCategory(currentCat))
@@ -763,14 +767,14 @@ function renderMaterials() {
       ${hasMfrs ? `
       <div style="display:flex;gap:6px;margin-bottom:6px">
         <select onchange="pickManufacturer(${i},this.value)" style="flex:1;background:#fff;border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:14px;outline:none;-webkit-appearance:auto">
-          <option value="">Manufacturer...</option>
+          <option value="">${subLabel}...</option>
           ${mfrOptions}
         </select>
       </div>` : ''}
       <div style="display:flex;gap:6px;align-items:flex-start">
         <div class="mat-desc-wrap" style="flex:3;position:relative">
           <select onchange="pickMaterialFromDropdown(${i},this.value)" ${!readyForMaterial?'disabled':''} style="width:100%;background:${readyForMaterial?'#fff':'#f5f5f7'};border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:15px;outline:none;-webkit-appearance:auto">
-            <option value="">${readyForMaterial ? 'Select material...' : (hasMfrs && currentCat && !currentMfr ? 'Pick manufacturer first' : 'Pick category first')}</option>
+            <option value="">${readyForMaterial ? 'Select material...' : (hasMfrs && currentCat && !currentMfr ? 'Pick ' + subLabel.toLowerCase() + ' first' : 'Pick category first')}</option>
             ${matOptions}
             ${readyForMaterial ? `<option value="__new__">＋ Add new material</option><option value="__manage__">🗑 Manage Materials</option>` : ''}
           </select>
@@ -793,6 +797,7 @@ function pickCategory(i, cat) {
       const trimmed = name.trim();
       if (!categoryList.includes(trimmed)) {
         categoryList.push(trimmed);
+        categoryList.sort((a,b) => a.localeCompare(b));
         saveCategoryList();
         saveCategoryToCloud(trimmed);
       }
