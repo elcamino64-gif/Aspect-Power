@@ -322,7 +322,7 @@ async function loadCloudData() {
 
     // Load materials DB (with category)
     const mats = await sbFetch('materials_db?order=name.asc');
-    if (mats) mats.forEach(m => { matDB[m.name] = { cost: m.cost || '', category: m.category || 'Hardware' }; });
+    if (mats) mats.forEach(m => { matDB[m.name] = { cost: m.cost || '', category: m.category || 'Hardware', manufacturer: m.manufacturer || '' }; });
 
     // Load categories
     const cats = await sbFetch('categories?order=id.asc');
@@ -382,7 +382,7 @@ async function deleteOrderFromCloud(id) {
   await sbFetch('work_orders?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' });
 }
 
-async function saveMatToCloud(name, cost, category) {
+async function saveMatToCloud(name, cost, category, manufacturer) {
   if (!name || !name.trim()) return;
   // Delete then insert to avoid conflict
   await fetch(SUPABASE_URL + '/rest/v1/materials_db?name=eq.' + encodeURIComponent(name.trim()), {
@@ -401,10 +401,10 @@ async function saveMatToCloud(name, cost, category) {
       'Content-Type': 'application/json',
       'Prefer': 'return=minimal'
     },
-    body: JSON.stringify({ name: name.trim(), cost: cost || '', category: category || 'Hardware' })
+    body: JSON.stringify({ name: name.trim(), cost: cost || '', category: category || 'Hardware', manufacturer: manufacturer || null })
   });
   if (!res.ok) console.error('saveMatToCloud failed:', res.status, await res.text());
-  else console.log('Material saved to cloud:', name, cost, category);
+  else console.log('Material saved to cloud:', name, cost, category, manufacturer);
 }
 
 async function savePropertyToCloud(name) {
@@ -438,7 +438,7 @@ async function saveTechToCloud(name) {
 // ── STATE ─────────────────────────────────────────────────
 let orders = [];
 let currentStatus = '';
-let materials = [{desc:'',qty:'',cost:'',category:''}];
+let materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
 let techLabor = [{rate:'',hours:'',type:'RT'}];
 let laborers = [{rate:'',hours:'',type:'RT'}];
 let currentOrderId = null;
@@ -597,7 +597,7 @@ try {
 } catch(e){}
 
 let categoryList = ["Conduit", "RMC", "LFMC", "EMT", "FMC", "PVC", "Conduit Body",
-  "Conductor", "ABB", "Connecticut Electric", "Eaton", "Siemens", "Square D",
+  "Conductor", "Circuit Breaker",
   "Splice", "Lug", "Grounding", "Receptacle", "Metering", "Pedestal", "Lighting",
   "Hardware", "Chemical"];
 try {
@@ -625,15 +625,19 @@ async function saveCategoryToCloud(name) {
 }
 
 let matDBTimer = null;
-function updateMatDB(desc, cost, category) {
+function updateMatDB(desc, cost, category, manufacturer) {
   if (!desc || !desc.trim()) return;
   const key = desc.trim();
-  const existing = matDB[key] || { cost: '', category: category || 'Hardware' };
-  matDB[key] = { cost: cost || existing.cost || '', category: category || existing.category || 'Hardware' };
+  const existing = matDB[key] || { cost: '', category: category || 'Hardware', manufacturer: manufacturer || '' };
+  matDB[key] = {
+    cost: cost || existing.cost || '',
+    category: category || existing.category || 'Hardware',
+    manufacturer: manufacturer || existing.manufacturer || ''
+  };
   try { localStorage.setItem('matDB', JSON.stringify(matDB)); } catch(e){}
   clearTimeout(matDBTimer);
   matDBTimer = setTimeout(() => {
-    saveMatToCloud(key, matDB[key].cost, matDB[key].category);
+    saveMatToCloud(key, matDB[key].cost, matDB[key].category, matDB[key].manufacturer);
   }, 1000);
 }
 
@@ -641,35 +645,53 @@ function closeAllAutocomplete() {
   document.querySelectorAll('.autocomplete-list').forEach(el => el.remove());
 }
 
-function naturalSizeSort(a, b) {
-  // Extract leading numbers/fractions for proper trade-size ordering
-  // e.g. "1/2in" < "3/4in" < "1in" < "1-1/4in" < "2in" instead of alphabetical
-  const toNum = (str) => {
-    const matches = str.match(/(\d+)-(\d+)\/(\d+)|(\d+)\/(\d+)|(\d+\.?\d*)/g);
-    if (!matches) return null;
-    // Use the LAST numeric token in the string (size usually trails the name)
-    const token = matches[matches.length - 1];
-    if (token.includes('-')) {
-      const [whole, frac] = token.split('-');
-      const [n, d] = frac.split('/');
-      return parseFloat(whole) + (parseFloat(n) / parseFloat(d));
-    } else if (token.includes('/')) {
-      const [n, d] = token.split('/');
-      return parseFloat(n) / parseFloat(d);
+// Convert a size token like "1/2", "1-1/4", "4/0", "250" into a comparable number
+function parseSizeToken(token) {
+  token = token.replace(/in|AWG|MCM|A|hp/gi, '').trim();
+  if (token.includes('-') && token.includes('/')) {
+    // mixed number e.g. 1-1/4
+    const [whole, frac] = token.split('-');
+    const [n, d] = frac.split('/');
+    return parseFloat(whole) + (parseFloat(n) / parseFloat(d));
+  } else if (token.includes('/')) {
+    // pure fraction e.g. 1/2  OR  AWG gauge like 4/0, 2/0, 3/0 (treat as negative gauge size)
+    const [n, d] = token.split('/');
+    if (parseFloat(n) < parseFloat(d)) {
+      return parseFloat(n) / parseFloat(d); // true fraction like 1/2in
     }
-    return parseFloat(token);
-  };
-  // Compare the non-numeric prefix first (so different families group together),
-  // then compare numerically within the same prefix
-  const prefixA = a.replace(/[\d\/\-\.]+(in|AWG|MCM|A|hp)?\s*$/i, '').trim();
-  const prefixB = b.replace(/[\d\/\-\.]+(in|AWG|MCM|A|hp)?\s*$/i, '').trim();
-  if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
-  const numA = toNum(a);
-  const numB = toNum(b);
-  if (numA === null && numB === null) return a.localeCompare(b);
-  if (numA === null) return 1;
-  if (numB === null) return -1;
-  return numA - numB;
+    // AWG gauge "X/0" notation (1/0, 2/0, 3/0, 4/0) is always LARGER wire than plain AWG numbers
+    return 100 + parseFloat(n);
+  }
+  return parseFloat(token) || 0;
+}
+
+// Extract every numeric/fraction token in order of appearance
+function extractSizeTokens(str) {
+  const matches = str.match(/\d+-\d+\/\d+|\d+\/\d+|\d+\.?\d*/g);
+  if (!matches) return [];
+  return matches.map(parseSizeToken);
+}
+
+function naturalSizeSort(a, b) {
+  // Special-case: Circuit Breaker style "X - 1P/2P - Y" — poles before amperage
+  const poleA = a.match(/\b([12])P\b/);
+  const poleB = b.match(/\b([12])P\b/);
+  if (poleA && poleB && poleA[1] !== poleB[1]) {
+    return parseInt(poleA[1]) - parseInt(poleB[1]);
+  }
+
+  const tokensA = extractSizeTokens(a);
+  const tokensB = extractSizeTokens(b);
+  const len = Math.max(tokensA.length, tokensB.length);
+  for (let i = 0; i < len; i++) {
+    const ta = tokensA[i];
+    const tb = tokensB[i];
+    if (ta === undefined && tb === undefined) break;
+    if (ta === undefined) return -1;
+    if (tb === undefined) return 1;
+    if (ta !== tb) return ta - tb;
+  }
+  return a.localeCompare(b);
 }
 
 function getMaterialsByCategory(category) {
@@ -678,15 +700,50 @@ function getMaterialsByCategory(category) {
     .sort(naturalSizeSort);
 }
 
+function getManufacturersForCategory(category) {
+  const mfrs = new Set();
+  Object.keys(matDB).forEach(name => {
+    if ((matDB[name].category || 'Hardware') === category && matDB[name].manufacturer) {
+      mfrs.add(matDB[name].manufacturer);
+    }
+  });
+  return Array.from(mfrs).sort();
+}
+
+function categoryHasManufacturers(category) {
+  return getManufacturersForCategory(category).length > 0;
+}
+
+function getMaterialsByCategoryAndManufacturer(category, manufacturer) {
+  return Object.keys(matDB)
+    .filter(name =>
+      (matDB[name].category || 'Hardware') === category &&
+      (!manufacturer || matDB[name].manufacturer === manufacturer)
+    )
+    .sort(naturalSizeSort);
+}
+
 function renderMaterials() {
   const el = document.getElementById('materials-list');
   el.innerHTML = '';
   materials.forEach((m, i) => {
     const currentCat = m.category || '';
+    const currentMfr = m.manufacturer || '';
     const catOptions = categoryList.map(c =>
       `<option value="${c}"${c===currentCat?' selected':''}>${c}</option>`
     ).join('');
-    const matNames = currentCat ? getMaterialsByCategory(currentCat) : [];
+
+    const hasMfrs = currentCat ? categoryHasManufacturers(currentCat) : false;
+    const mfrList = hasMfrs ? getManufacturersForCategory(currentCat) : [];
+    const mfrOptions = mfrList.map(mf =>
+      `<option value="${mf}"${mf===currentMfr?' selected':''}>${mf}</option>`
+    ).join('');
+
+    // Materials only show once category (and manufacturer, if applicable) is chosen
+    const readyForMaterial = currentCat && (!hasMfrs || currentMfr);
+    const matNames = readyForMaterial
+      ? (hasMfrs ? getMaterialsByCategoryAndManufacturer(currentCat, currentMfr) : getMaterialsByCategory(currentCat))
+      : [];
     const matOptions = matNames.map(name =>
       `<option value="${name}"${name===m.desc?' selected':''}>${name}</option>`
     ).join('');
@@ -703,18 +760,25 @@ function renderMaterials() {
           <option value="__newcat__">＋ Add new category</option>
         </select>
       </div>
+      ${hasMfrs ? `
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <select onchange="pickManufacturer(${i},this.value)" style="flex:1;background:#fff;border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:14px;outline:none;-webkit-appearance:auto">
+          <option value="">Manufacturer...</option>
+          ${mfrOptions}
+        </select>
+      </div>` : ''}
       <div style="display:flex;gap:6px;align-items:flex-start">
         <div class="mat-desc-wrap" style="flex:3;position:relative">
-          <select onchange="pickMaterialFromDropdown(${i},this.value)" ${!currentCat?'disabled':''} style="width:100%;background:${currentCat?'#fff':'#f5f5f7'};border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:15px;outline:none;-webkit-appearance:auto">
-            <option value="">${currentCat ? 'Select material...' : 'Pick category first'}</option>
+          <select onchange="pickMaterialFromDropdown(${i},this.value)" ${!readyForMaterial?'disabled':''} style="width:100%;background:${readyForMaterial?'#fff':'#f5f5f7'};border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:15px;outline:none;-webkit-appearance:auto">
+            <option value="">${readyForMaterial ? 'Select material...' : (hasMfrs && currentCat && !currentMfr ? 'Pick manufacturer first' : 'Pick category first')}</option>
             ${matOptions}
-            ${currentCat ? `<option value="__new__">＋ Add new material</option><option value="__manage__">🗑 Manage Materials</option>` : ''}
+            ${readyForMaterial ? `<option value="__new__">＋ Add new material</option><option value="__manage__">🗑 Manage Materials</option>` : ''}
           </select>
         </div>
         <input type="text" class="qty" placeholder="Qty" value="${m.qty||''}"
           oninput="materials[${i}].qty=this.value;updateTotal()" autocomplete="off"/>
         <input type="text" class="cost" placeholder="$" value="${m.cost||''}"
-          oninput="materials[${i}].cost=this.value;updateTotal();updateMatDB(materials[${i}].desc,this.value,materials[${i}].category)" autocomplete="off"/>
+          oninput="materials[${i}].cost=this.value;updateTotal();updateMatDB(materials[${i}].desc,this.value,materials[${i}].category,materials[${i}].manufacturer)" autocomplete="off"/>
         ${materials.length > 1 ? `<button class="btn-remove" onclick="removeMaterial(${i})">×</button>` : '<span style="width:26px"></span>'}
       </div>
     `;
@@ -733,6 +797,7 @@ function pickCategory(i, cat) {
         saveCategoryToCloud(trimmed);
       }
       materials[i].category = trimmed;
+      materials[i].manufacturer = '';
       materials[i].desc = '';
       materials[i].cost = '';
       renderMaterials();
@@ -740,6 +805,14 @@ function pickCategory(i, cat) {
     return;
   }
   materials[i].category = cat;
+  materials[i].manufacturer = '';
+  materials[i].desc = '';
+  materials[i].cost = '';
+  renderMaterials();
+}
+
+function pickManufacturer(i, mfr) {
+  materials[i].manufacturer = mfr;
   materials[i].desc = '';
   materials[i].cost = '';
   renderMaterials();
@@ -749,20 +822,25 @@ function showManageMaterials(rowIndex) {
   const list = document.getElementById('manage-mat-list');
   const names = Object.keys(matDB).sort((a,b) => {
     const ca = matDB[a].category || '', cb = matDB[b].category || '';
-    return ca === cb ? naturalSizeSort(a, b) : ca.localeCompare(cb);
+    if (ca !== cb) return ca.localeCompare(cb);
+    const ma = matDB[a].manufacturer || '', mb = matDB[b].manufacturer || '';
+    if (ma !== mb) return ma.localeCompare(mb);
+    return naturalSizeSort(a, b);
   });
   if (!names.length) {
     list.innerHTML = '<div style="text-align:center;color:#86868b;padding:20px;font-size:14px">No saved materials yet.</div>';
   } else {
-    list.innerHTML = names.map(name => `
+    list.innerHTML = names.map(name => {
+      const mfrTag = matDB[name].manufacturer ? ` · ${matDB[name].manufacturer}` : '';
+      return `
       <div class="manage-mat-row">
         <div class="manage-mat-info">
           <div class="manage-mat-name">${name}</div>
-          <div class="manage-mat-cost">${matDB[name].category || 'Hardware'} ${matDB[name].cost ? '· $' + matDB[name].cost : ''}</div>
+          <div class="manage-mat-cost">${matDB[name].category || 'Hardware'}${mfrTag} ${matDB[name].cost ? '· $' + matDB[name].cost : ''}</div>
         </div>
         <button class="manage-mat-delete" onclick="deleteMaterial('${name.replace(/'/g,"\\'")}', ${rowIndex})">Delete</button>
       </div>
-    `).join('');
+    `;}).join('');
   }
   document.getElementById('manage-mat-overlay').style.display = 'flex';
 }
@@ -805,11 +883,13 @@ function pickMaterialFromDropdown(i, val) {
   }
   if (val === '__new__') {
     const cat = materials[i].category || 'Hardware';
-    showModal(`New ${cat} Material`, 'Material name', 'Default cost (optional)', (name, cost) => {
+    const mfr = materials[i].manufacturer || '';
+    const label = mfr ? `New ${mfr} ${cat} Material` : `New ${cat} Material`;
+    showModal(label, 'Material name', 'Default cost (optional)', (name, cost) => {
       const trimmed = name.trim();
-      matDB[trimmed] = { cost: cost || '', category: cat };
+      matDB[trimmed] = { cost: cost || '', category: cat, manufacturer: mfr };
       try { localStorage.setItem('matDB', JSON.stringify(matDB)); } catch(e){}
-      saveMatToCloud(trimmed, cost || '', cat);
+      saveMatToCloud(trimmed, cost || '', cat, mfr);
       materials[i].desc = trimmed;
       materials[i].cost = cost || '';
       renderMaterials();
@@ -830,7 +910,7 @@ function pickMaterialFromDropdown(i, val) {
 }
 
 function addMaterial() {
-  materials.push({desc:'',qty:'',cost:'',category:''});
+  materials.push({desc:'',qty:'',cost:'',category:'',manufacturer:''});
   renderMaterials();
   setTimeout(() => {
     const rows = document.querySelectorAll('.mat-row');
@@ -931,7 +1011,7 @@ function resetForm() {
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notes').value = '';
   document.getElementById('f-vehicles').value = '1';
-  materials = [{desc:'',qty:'',cost:'',category:''}];
+  materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
   techLabor = [{rate:'',hours:'',type:'RT'}];
   laborers = [{rate:'',hours:'',type:'RT'}];
   currentStatus = '';
