@@ -168,7 +168,11 @@ textarea{resize:vertical;line-height:1.6}
     <div class="section">
       <div class="section-title">Description of Work</div>
       <textarea id="f-desc" rows="4" placeholder="Describe the work preformed..."></textarea>
-      <button type="button" class="btn-add" id="ai-polish-btn" onclick="polishDescription()" style="margin-top:8px">✨ AI Polish</button>
+      <label class="checkbox-row" style="margin-top:10px;margin-bottom:8px">
+        <div class="checkbox" id="ai-friendly-check" onclick="toggleAiFriendly()"></div>
+        <span style="color:#1d1d1f;font-size:14px">Customer-friendly language</span>
+      </label>
+      <button type="button" class="btn-add" id="ai-polish-btn" onclick="polishDescription()">✨ AI Polish</button>
     </div>
 
     <div class="section">
@@ -265,6 +269,38 @@ textarea{resize:vertical;line-height:1.6}
 const SUPABASE_URL = 'https://rvrilypibjcmcmyzoynx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2cmlseXBpYmpjbWNteXpveW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5Njg0OTIsImV4cCI6MjA5NjU0NDQ5Mn0.LvnG4xjL3aPqZ2bOvBqgAnRluYVeyH3Yjka2Kkp-QCQ';
 
+let descriptionBeforePolish = null;
+
+let aiFriendlyMode = false;
+
+function toggleAiFriendly() {
+  aiFriendlyMode = !aiFriendlyMode;
+  const check = document.getElementById('ai-friendly-check');
+  check.className = 'checkbox' + (aiFriendlyMode ? ' checked' : '');
+}
+
+function gatherJobContext() {
+  const matNames = materials
+    .filter(m => m.desc && m.desc.trim())
+    .map(m => m.qty ? `${m.desc} (qty ${m.qty})` : m.desc);
+
+  const techHrs = techLabor.filter(r => r.hours).reduce((s,r) => s + (parseFloat(r.hours)||0), 0);
+  const assistHrs = techAssist.filter(r => r.hours).reduce((s,r) => s + (parseFloat(r.hours)||0), 0);
+  const laborHrs = laborers.filter(r => r.hours).reduce((s,r) => s + (parseFloat(r.hours)||0), 0);
+
+  const parts = [];
+  if (matNames.length) parts.push('Materials used: ' + matNames.join(', ') + '.');
+  if (techHrs) parts.push(`Technician hours: ${techHrs}.`);
+  if (assistHrs) parts.push(`Technicians assistant hours: ${assistHrs}.`);
+  if (laborHrs) parts.push(`Laborer hours: ${laborHrs}.`);
+
+  const park = document.getElementById('f-park').value;
+  const space = document.getElementById('f-space').value;
+  if (park) parts.push(`Property: ${park}${space ? ', space ' + space : ''}.`);
+
+  return parts.join(' ');
+}
+
 async function polishDescription() {
   const textarea = document.getElementById('f-desc');
   const btn = document.getElementById('ai-polish-btn');
@@ -287,7 +323,11 @@ async function polishDescription() {
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'apikey': SUPABASE_KEY
       },
-      body: JSON.stringify({ notes: raw })
+      body: JSON.stringify({
+        notes: raw,
+        context: gatherJobContext(),
+        friendly: aiFriendlyMode
+      })
     });
     if (!res.ok) {
       const errText = await res.text();
@@ -297,7 +337,9 @@ async function polishDescription() {
     }
     const data = await res.json();
     if (data.polished) {
+      descriptionBeforePolish = raw;
       textarea.value = data.polished.trim();
+      showUndoButton();
     } else {
       alert('AI Polish did not return a result. Please try again.');
     }
@@ -308,6 +350,30 @@ async function polishDescription() {
     btn.textContent = originalLabel;
     btn.disabled = false;
   }
+}
+
+function showUndoButton() {
+  let undoBtn = document.getElementById('ai-undo-btn');
+  if (!undoBtn) {
+    undoBtn = document.createElement('button');
+    undoBtn.id = 'ai-undo-btn';
+    undoBtn.type = 'button';
+    undoBtn.className = 'btn-ghost';
+    undoBtn.style.cssText = 'margin-top:8px;width:100%';
+    undoBtn.onclick = undoPolish;
+    const polishBtn = document.getElementById('ai-polish-btn');
+    polishBtn.insertAdjacentElement('afterend', undoBtn);
+  }
+  undoBtn.textContent = '↩ Undo AI Polish';
+  undoBtn.style.display = 'block';
+}
+
+function undoPolish() {
+  if (descriptionBeforePolish === null) return;
+  document.getElementById('f-desc').value = descriptionBeforePolish;
+  const undoBtn = document.getElementById('ai-undo-btn');
+  if (undoBtn) undoBtn.style.display = 'none';
+  descriptionBeforePolish = null;
 }
 
 async function sbFetch(path, options = {}) {
@@ -1146,6 +1212,12 @@ function resetForm() {
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notes').value = '';
   document.getElementById('f-vehicles').value = '0';
+  descriptionBeforePolish = null;
+  aiFriendlyMode = false;
+  const friendlyCheck = document.getElementById('ai-friendly-check');
+  if (friendlyCheck) friendlyCheck.className = 'checkbox';
+  const undoBtn = document.getElementById('ai-undo-btn');
+  if (undoBtn) undoBtn.style.display = 'none';
   materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
   techLabor = [{rate:'225',hours:'',type:'RT'}];
   techAssist = [{rate:'150',hours:'',type:'RT'}];
