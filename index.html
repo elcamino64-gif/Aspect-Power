@@ -182,6 +182,16 @@ textarea{resize:vertical;line-height:1.6}
     </div>
 
     <div class="section">
+      <div class="section-title">Testing Services</div>
+      <div id="testing-list"></div>
+      <button class="btn-add" onclick="addTestingService()">+ Add Testing Service</button>
+      <div class="subtotal-row">
+        <span class="subtotal-label">Testing Subtotal</span>
+        <span class="subtotal-value" id="testing-subtotal">$0.00</span>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="section-title">Technical Labor</div>
       <div id="tech-list"></div>
       <button class="btn-add" onclick="addLabor('tech')">+ Add Technician</button>
@@ -277,8 +287,12 @@ function gatherJobContext() {
   const assistHrs = techAssist.filter(r => r.hours).reduce((s,r) => s + (parseFloat(r.hours)||0), 0);
   const laborHrs = laborers.filter(r => r.hours).reduce((s,r) => s + (parseFloat(r.hours)||0), 0);
 
+  const testNames = testingServices
+    .filter(t => t.service && t.service.trim())
+    .map(t => t.service);
   const parts = [];
   if (matNames.length) parts.push('Materials used: ' + matNames.join(', ') + '.');
+  if (testNames.length) parts.push('Testing performed: ' + testNames.join(', ') + '.');
   if (techHrs) parts.push(`Technician hours: ${techHrs}.`);
   if (assistHrs) parts.push(`Technicians assistant hours: ${assistHrs}.`);
   if (laborHrs) parts.push(`Laborer hours: ${laborHrs}.`);
@@ -398,6 +412,7 @@ async function loadCloudData() {
         spaceLocation: o.space_location,
         description: o.description,
         materials: o.materials || [],
+        testing: o.testing || [],
         techLabor: o.tech_labor || [],
         techAssist: o.tech_assist || [],
         laborers: o.laborers || [],
@@ -477,6 +492,7 @@ async function saveOrderToCloud(order) {
       space_location: order.spaceLocation,
       description: order.description,
       materials: order.materials,
+      testing: order.testing || [],
       tech_labor: order.techLabor,
       tech_assist: order.techAssist,
       laborers: order.laborers,
@@ -558,6 +574,121 @@ let currentOrderId = null;
 let touchStartX = null;
 let swipedCardId = null;
 
+// ── TESTING SERVICES ──────────────────────────────────────
+let testingServices = [];
+let testingDB = {};
+const DEFAULT_TESTING_DB = {
+  'Insulation Resistance Testing (Megger) \u2014 Primary Conductors, All Phases': '250',
+  'Infrared Thermal Imaging \u2014 Main Switchgear, Energized Components': '350',
+  'Insulation Resistance Testing (Megger) \u2014 Single Phase': '',
+  'Ground Fault Testing': '',
+  'Continuity Testing': '',
+  'Phase Rotation Testing': '',
+  'Voltage / Amperage Survey': '',
+  'Load Testing': '',
+};
+try {
+  const _tdb = JSON.parse(localStorage.getItem('testingDB') || 'null');
+  testingDB = _tdb || JSON.parse(JSON.stringify(DEFAULT_TESTING_DB));
+  if (!_tdb) localStorage.setItem('testingDB', JSON.stringify(testingDB));
+} catch(e) { testingDB = JSON.parse(JSON.stringify(DEFAULT_TESTING_DB)); }
+
+function saveTestingDB() {
+  try { localStorage.setItem('testingDB', JSON.stringify(testingDB)); } catch(e) {}
+}
+
+function renderTestingServices() {
+  const el = document.getElementById('testing-list');
+  if (!el) return;
+  el.innerHTML = '';
+  testingServices.forEach((t, i) => {
+    const names = Object.keys(testingDB).sort((a, b) => a.localeCompare(b));
+    const opts = names.map(n => `<option value="${n}"${n === t.service ? ' selected' : ''}>${n}</option>`).join('');
+    const row = document.createElement('div');
+    row.className = 'mat-row';
+    row.style.alignItems = 'center';
+    row.innerHTML = `
+      <select onchange="pickTestingService(${i},this.value)"
+        style="flex:1;background:#fff;border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:15px;outline:none;-webkit-appearance:auto">
+        <option value="">Select test...</option>
+        ${opts}
+        <option value="__new__">&#65291; Add new service</option>
+        <option value="__manage__">&#128465; Manage Services</option>
+      </select>
+      <input type="text" class="cost" placeholder="$" value="${t.cost || ''}"
+        oninput="testingServices[${i}].cost=this.value;updateTestingDB(testingServices[${i}].service,this.value);updateTotal()"
+        autocomplete="off"/>
+      ${testingServices.length > 1
+        ? `<button class="btn-remove" onclick="removeTestingService(${i})">&#215;</button>`
+        : '<span style="width:26px"></span>'}
+    `;
+    el.appendChild(row);
+  });
+  updateTotal();
+}
+
+function addTestingService() {
+  testingServices.push({ service: '', cost: '' });
+  renderTestingServices();
+}
+
+function removeTestingService(i) {
+  testingServices.splice(i, 1);
+  renderTestingServices();
+  updateTotal();
+}
+
+function pickTestingService(i, val) {
+  if (val === '__new__') {
+    showModal('New Testing Service', 'Service name', 'Default rate (optional)', (name, cost) => {
+      const trimmed = name.trim();
+      testingDB[trimmed] = cost || '';
+      saveTestingDB();
+      testingServices[i] = { service: trimmed, cost: cost || '' };
+      renderTestingServices();
+    });
+    return;
+  }
+  if (val === '__manage__') {
+    showManageTestingServices(i);
+    return;
+  }
+  testingServices[i].service = val;
+  testingServices[i].cost = val ? (testingDB[val] || '') : '';
+  renderTestingServices();
+}
+
+function updateTestingDB(service, cost) {
+  if (!service || !service.trim()) return;
+  testingDB[service.trim()] = cost || '';
+  saveTestingDB();
+}
+
+function showManageTestingServices(rowIndex) {
+  const list = document.getElementById('manage-mat-list');
+  const names = Object.keys(testingDB).sort((a, b) => a.localeCompare(b));
+  list.innerHTML = names.length ? names.map(n => `
+    <div class="manage-mat-row">
+      <div class="manage-mat-info">
+        <div class="manage-mat-name">${n}</div>
+        <div class="manage-mat-cost">${testingDB[n] ? '$' + testingDB[n] + ' flat rate' : 'No default rate'}</div>
+      </div>
+      <button class="manage-mat-delete" onclick="deleteTestingService(${JSON.stringify(n)},${rowIndex})">Delete</button>
+    </div>`).join('')
+    : '<div style="text-align:center;color:#86868b;padding:20px;font-size:14px">No saved testing services.</div>';
+  document.getElementById('manage-mat-overlay').style.display = 'flex';
+}
+
+function deleteTestingService(name, rowIndex) {
+  if (!confirm('Delete "' + name + '" from testing services?')) return;
+  delete testingDB[name];
+  saveTestingDB();
+  if (testingServices[rowIndex] && testingServices[rowIndex].service === name) {
+    testingServices[rowIndex] = { service: '', cost: '' };
+  }
+  showManageTestingServices(rowIndex);
+}
+
 // ── LOAD ──────────────────────────────────────────────────
 try { orders = JSON.parse(localStorage.getItem('workOrders') || '[]'); } catch(e){}
 
@@ -571,16 +702,20 @@ function fmtDate(d) {
 // ── CALC ──────────────────────────────────────────────────
 function calcTotal() {
   const mat = materials.reduce((s,m) => s + (parseFloat(m.qty)||1)*(parseFloat(m.cost)||0), 0);
+  const test = testingServices.reduce((s,t) => s + (parseFloat(t.cost)||0), 0);
   const tech = techLabor.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const assist = techAssist.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const lab = laborers.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
-  return mat + tech + assist + lab;
+  return mat + test + tech + assist + lab;
 }
 
 function updateTotal() {
   document.getElementById('form-total').textContent = '$' + calcTotal().toFixed(2);
   const ms = materials.reduce((s,m) => s + (parseFloat(m.qty)||1)*(parseFloat(m.cost)||0), 0);
   document.getElementById('mat-subtotal').textContent = '$' + ms.toFixed(2);
+  const ts = testingServices.reduce((s,t) => s + (parseFloat(t.cost)||0), 0);
+  const tsel = document.getElementById('testing-subtotal');
+  if (tsel) tsel.textContent = '$' + ts.toFixed(2);
 }
 
 // ── MATERIALS ─────────────────────────────────────────────
@@ -1014,6 +1149,7 @@ function showManageMaterials(rowIndex) {
 function closeManageMaterials() {
   document.getElementById('manage-mat-overlay').style.display = 'none';
   renderMaterials();
+  renderTestingServices();
   renderLabor();
 }
 
@@ -1227,6 +1363,7 @@ function saveOrder() {
     spaceLocation: document.getElementById('f-space').value,
     description: document.getElementById('f-desc').value,
     materials: materials.map(m=>({...m})),
+    testing: testingServices.map(t=>({...t})),
     techLabor: techLabor.map(r=>({...r})),
     techAssist: techAssist.map(r=>({...r})),
     laborers: laborers.map(r=>({...r})),
@@ -1257,6 +1394,7 @@ function resetForm() {
   const undoBtn = document.getElementById('ai-undo-btn');
   if (undoBtn) undoBtn.style.display = 'none';
   materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
+  testingServices = [];
   techLabor = [{rate:'225',hours:'',type:'RT'}];
   techAssist = [{rate:'150',hours:'',type:'RT'}];
   laborers = [{rate:'150',hours:'',type:'RT'}];
@@ -1264,6 +1402,7 @@ function resetForm() {
   document.getElementById('btn-complete').className = 'status-btn';
   document.getElementById('btn-inprogress').className = 'status-btn';
   renderMaterials();
+  renderTestingServices();
   renderLabor();
   updateTotal();
 }
@@ -1293,6 +1432,7 @@ function showDetail(id) {
   badge.className = 'status-badge ' + (o.status==='Complete'?'badge-complete':o.status==='In Progress'?'badge-inprogress':'badge-none');
 
   const el = document.getElementById('detail-content');
+  const testLinesList = (o.testing||[]).filter(t=>t.service||t.cost).map(t=>`<div class="detail-row"><span class="detail-label">${t.service||'—'}</span><span class="detail-value">$${parseFloat(t.cost||0).toFixed(2)}</span></div>`).join('');
   const matLines = o.materials.filter(m=>m.desc||m.cost).map(m=>`<div class="detail-row"><span class="detail-label">${m.desc||'—'} × ${m.qty||1}</span><span class="detail-value">$${((parseFloat(m.qty)||1)*(parseFloat(m.cost)||0)).toFixed(2)}</span></div>`).join('');
   const techLines = o.techLabor.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
   const assistLines = (o.techAssist||[]).filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
@@ -1305,6 +1445,7 @@ function showDetail(id) {
     <div class="detail-row"><span class="detail-label">Space / Location</span><span class="detail-value">${o.spaceLocation||'—'}</span></div>
     ${o.description?`<div class="detail-card"><div class="detail-card-title">Description</div><div class="detail-card-text">${o.description}</div></div>`:''}
     ${matLines?`<div class="detail-card"><div class="detail-card-title">Materials</div>${matLines}</div>`:''}
+    ${testLinesList?`<div class="detail-card"><div class="detail-card-title">Testing Services</div>${testLinesList}</div>`:''}
     ${techLines?`<div class="detail-card"><div class="detail-card-title">Technical Labor</div>${techLines}</div>`:''}
     ${assistLines?`<div class="detail-card"><div class="detail-card-title">Technicians Assistant</div>${assistLines}</div>`:''}
     ${labLines?`<div class="detail-card"><div class="detail-card-title">Laborer</div>${labLines}</div>`:''}
@@ -1440,6 +1581,15 @@ function buildPlainEmail(o) {
     b += `\nMaterials Subtotal:  $${matTotal.toFixed(2)}\n`;
   }
 
+  const testRowsEmail = (o.testing||[]).filter(t=>t.service||t.cost);
+  if (testRowsEmail.length) {
+    b += `\n────────────────────────────────────────\nTESTING SERVICES\n\n`;
+    testRowsEmail.forEach(t => {
+      b += `${t.service||'—'}          $${parseFloat(t.cost||0).toFixed(2)}\n`;
+    });
+    b += '\n';
+  }
+
   if (techRows.length) {
     b += `\n${'─'.repeat(40)}\nTECHNICAL LABOR\n\n`;
     techRows.forEach(r => {
@@ -1517,6 +1667,15 @@ function buildHtmlEmail(o) {
     <span style="color:#1d1d1f;font-size:14px;font-weight:700;">$${matTotal.toFixed(2)}</span>
   </div>`;
   const matSection = matRows.length ? card('Materials', matContent) : '';
+
+  // Testing Services
+  const testRowsHtml = (o.testing||[]).filter(t=>t.service||t.cost);
+  let testContent = testRowsHtml.map(t => `
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;">
+      <span style="color:#1d1d1f;font-size:14px;">${t.service||'—'}</span>
+      <span style="color:#1d1d1f;font-size:14px;font-weight:600;">$${parseFloat(t.cost||0).toFixed(2)}</span>
+    </div>`).join('');
+  const testSectionHtml = testRowsHtml.length ? card('Testing Services', testContent) : '';
 
   // Technical Labor
   let techContent = techRows.map(r => {
@@ -1598,6 +1757,7 @@ function buildHtmlEmail(o) {
 
       ${descSection}
       ${matSection}
+      ${testSectionHtml}
       ${techSection}
       ${assistSection}
       ${labSection}
@@ -1733,6 +1893,7 @@ document.addEventListener('click', (e) => {
 });
 populateDropdowns();
 renderMaterials();
+renderTestingServices();
 renderLabor();
 updateOrderCount();
 loadCloudData();
