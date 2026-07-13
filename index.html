@@ -178,7 +178,10 @@ textarea{resize:vertical;line-height:1.6}
 .att{position:relative;width:84px}
 .att img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid #d2d2d7;cursor:pointer;display:block}
 .att-file{width:100%;display:flex;align-items:center;gap:8px;background:#f5f5f7;border:1px solid #e5e5ea;border-radius:10px;padding:10px 12px}
-.att-file a{flex:1;color:#1d1d1f;font-size:13px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-name{flex:1;color:#1d1d1f;font-size:13px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.att-cat{margin-bottom:14px}
+.att-cat:last-child{margin-bottom:0}
+.att-cat-label{font-size:11px;font-weight:700;letter-spacing:0.3px;color:#3a3a3c;margin-bottom:7px}
 .att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
 .att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
@@ -2223,14 +2226,25 @@ function checklistHtml(o) {
 }
 
 // ── Attachments (photos / files, stored with the job) ─────
+const ATT_CATS = ['Contract', 'Permit', 'Other'];
+
+function renderAtt(o, a) {
+  const isImg = a.type && a.type.indexOf('image/') === 0;
+  return isImg
+    ? `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
+    : `<div class="att att-file"><span class="att-name" onclick="openAttachment(${o.id},${a.id})">📄 ${escHtml(a.name)}</span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
+}
+
 function attachmentsHtml(o) {
   const atts = Array.isArray(o.attachments) ? o.attachments : [];
-  const grid = atts.map(a => (a.type && a.type.indexOf('image/') === 0)
-    ? `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
-    : `<div class="att att-file"><a href="${a.dataUrl}" download="${escHtml(a.name)}">📄 ${escHtml(a.name)}</a><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
-  ).join('');
-  return `${atts.length ? `<div class="att-grid">${grid}</div>` : '<div class="att-empty">No files yet</div>'}
-    <label class="att-add">📎 Add attachment<input type="file" accept="image/*,application/pdf" style="display:none" onchange="handleAttachmentPick(event,${o.id})"/></label>`;
+  return ATT_CATS.map(cat => {
+    const items = atts.filter(a => (a.category || 'Other') === cat);
+    return `<div class="att-cat">
+      <div class="att-cat-label">${cat}</div>
+      ${items.length ? `<div class="att-grid">${items.map(a => renderAtt(o, a)).join('')}</div>` : ''}
+      <label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" style="display:none" onchange="handleAttachmentPick(event,${o.id},'${cat}')"/>📎 Add ${cat}</label>
+    </div>`;
+  }).join('');
 }
 
 function readAsDataURL(file) {
@@ -2261,7 +2275,7 @@ function compressImage(file, maxDim, quality) {
   });
 }
 
-async function handleAttachmentPick(ev, id) {
+async function handleAttachmentPick(ev, id, category) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
   const o = boardJobs.find(x => x.id === id);
@@ -2272,11 +2286,11 @@ async function handleAttachmentPick(ev, id) {
       dataUrl = await compressImage(file, 1400, 0.7);
       type = 'image/jpeg';
     } else {
-      if (file.size > 2 * 1024 * 1024) { alert('That file is over 2 MB. Please attach a smaller file (or a photo).'); ev.target.value = ''; return; }
+      if (file.size > 4 * 1024 * 1024) { alert('That file is over 4 MB. Please attach a smaller file (or a photo).'); ev.target.value = ''; return; }
       dataUrl = await readAsDataURL(file);
     }
     if (!Array.isArray(o.attachments)) o.attachments = [];
-    o.attachments.push({ id: Date.now(), name: file.name, type, dataUrl });
+    o.attachments.push({ id: Date.now(), name: file.name, type, category: category || 'Other', dataUrl });
     persistBoardJob(o);
     refreshBoardViews();
   } catch (e) {
@@ -2295,12 +2309,36 @@ function deleteAttachment(jobId, attId) {
   refreshBoardViews();
 }
 
+function dataUrlToBlob(dataUrl) {
+  const parts = dataUrl.split(',');
+  const mime = (parts[0].match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+  const bin = atob(parts[1]);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 function openAttachment(jobId, attId) {
   const o = boardJobs.find(x => x.id === jobId);
   const a = o && Array.isArray(o.attachments) ? o.attachments.find(x => x.id === attId) : null;
   if (!a) return;
-  document.getElementById('att-lightbox-img').src = a.dataUrl;
-  document.getElementById('att-lightbox').classList.add('show');
+  // Images open in the in-app lightbox
+  if (a.type && a.type.indexOf('image/') === 0) {
+    document.getElementById('att-lightbox-img').src = a.dataUrl;
+    document.getElementById('att-lightbox').classList.add('show');
+    return;
+  }
+  // PDFs / other files open in a new tab (works from this tap gesture)
+  try {
+    const url = URL.createObjectURL(dataUrlToBlob(a.dataUrl));
+    const link = document.createElement('a');
+    link.href = url; link.target = '_blank'; link.rel = 'noopener';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    console.error('open attachment failed:', e);
+    alert('Sorry, this file could not be opened.');
+  }
 }
 function closeLightbox() { document.getElementById('att-lightbox').classList.remove('show'); }
 
@@ -2382,9 +2420,16 @@ function showBoardJob(id) {
     <div class="detail-card"><div class="detail-card-title">Stage</div>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
     </div>
-    <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
+    <button class="btn-primary" style="margin-top:20px" onclick="saveBoardJobDone(${o.id})">Save</button>
+    <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:10px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
+}
+
+function saveBoardJobDone(id) {
+  const o = boardJobs.find(x => x.id === id);
+  if (o) persistBoardJob(o);
+  showBoard();
 }
 
 // Re-render whichever board view is on screen (board or full job detail)
