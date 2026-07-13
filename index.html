@@ -2089,11 +2089,10 @@ function updateOrderCount() {
 // ══ JOB BOARD (its own data, separate from Orders / work_orders) ══════════
 const STAGES = [
   { name: 'Inquiries',                 color: '#86868B' },
-  { name: 'Quoted',                    color: '#2E97F2' },
+  { name: 'Approved',                  color: '#2E97F2' },
   { name: 'Permit Pending',            color: '#F5A623' },
   { name: 'Ready to Schedule',         color: '#12B5AE' },
   { name: 'In Progress',               color: '#8257E6' },
-  { name: 'Inspection / PG&E',         color: '#FF8A3D' },
   { name: 'Complete — Ready to Bill',  color: '#34C759' }
 ];
 let boardJobs = [];
@@ -2108,6 +2107,8 @@ let njAttachments = [];
 function normalizeStage(status) {
   if (!status) return 'Inquiries';
   if (STAGES.some(s => s.name === status)) return status;
+  if (status === 'Quoted') return 'Approved';                 // renamed stage
+  if (status === 'Inspection / PG&E') return 'In Progress';   // removed stage → nearest
   if (status === 'Complete') return 'Complete — Ready to Bill';
   return 'Inquiries';
 }
@@ -2244,7 +2245,7 @@ function boardCardHtml(o) {
   const tagHtml = o.statusTag ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
   return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
-      <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'PROJ':'SVC'}</span>
+      <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'Project':'Service'}</span>
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
     </div>
     ${o.spaceLocation?`<div class="board-card-space">Space ${escHtml(o.spaceLocation)}</div>`:''}
@@ -2601,6 +2602,9 @@ function njSetType(t) {
   njType = t;
   document.getElementById('nj-type-project').className = (t==='project' ? 'on' : '');
   document.getElementById('nj-type-service').className = (t==='service' ? 'on' : '');
+  // Service calls default to "Ready to Schedule"; projects start at "Inquiries"
+  const njStage = document.getElementById('nj-stage');
+  if (njStage) njStage.value = (t === 'service') ? 'Ready to Schedule' : 'Inquiries';
 }
 function openNewJob() {
   populateBoardDropdowns();
