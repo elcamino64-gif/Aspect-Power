@@ -113,15 +113,19 @@ textarea{resize:vertical;line-height:1.6}
 .addbar{padding:10px 16px 2px;flex-shrink:0}
 .add-new{width:100%;border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:15px;font-weight:600;padding:12px 0;border-radius:12px;cursor:pointer;font-family:inherit}
 .add-new:active{background:#2e97f210}
-.board-scroll{flex:1;display:flex;gap:12px;overflow-x:auto;overflow-y:hidden;padding:12px 16px 24px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
-.board-scroll::-webkit-scrollbar{height:0}
-.board-col{flex:0 0 84%;max-width:322px;scroll-snap-align:start;display:flex;flex-direction:column;height:100%}
+.board-zoombar{display:flex;align-items:center;gap:10px;padding:8px 16px 0;flex-shrink:0}
+.zoom-ico{font-size:13px;opacity:0.6}
+.zoom-slider{flex:1;accent-color:#05befe;height:26px}
+.zoom-btn{border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:9px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.board-scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+.board-scroll::-webkit-scrollbar{height:0;width:0}
+#board-canvas{display:flex;gap:12px;padding:12px 16px 24px;align-items:flex-start;zoom:var(--board-zoom,1)}
+.board-col{flex:0 0 300px;width:300px;max-width:300px;display:flex;flex-direction:column}
 .board-col-head{display:flex;align-items:center;gap:9px;padding:0 2px 9px;border-bottom:1px solid #e5e5ea;margin-bottom:11px;flex-shrink:0}
 .board-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 .board-col-name{font-size:16px;font-weight:700;letter-spacing:0.2px;color:#1d1d1f}
 .board-col-count{margin-left:auto;font-size:12.5px;font-weight:600;color:#86868b;background:#fff;border:1px solid #d2d2d7;border-radius:20px;padding:1px 9px}
-.board-cards{display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;padding:2px 2px 16px}
-.board-cards::-webkit-scrollbar{width:0}
+.board-cards{display:flex;flex-direction:column;gap:10px;padding:2px 2px 16px}
 .board-card{background:#fff;border:1px solid #d2d2d7;border-left:4px solid var(--edge,#ccc);border-radius:14px;padding:13px 14px 12px;cursor:pointer;transition:box-shadow 0.13s}
 .board-card:active{box-shadow:0 2px 10px rgba(0,0,0,0.07)}
 .board-card.open{box-shadow:0 5px 20px rgba(0,0,0,0.11)}
@@ -382,10 +386,14 @@ textarea{resize:vertical;line-height:1.6}
       <button onclick="setBoardFilter('project')">Projects</button>
       <button onclick="setBoardFilter('service')">Service</button>
     </div>
-    <span class="swipe-hint">swipe stages →</span>
+  </div>
+  <div class="board-zoombar">
+    <span class="zoom-ico">🔍</span>
+    <input type="range" class="zoom-slider" id="board-zoom" min="15" max="100" value="100" oninput="setBoardZoom(this.value)"/>
+    <button class="zoom-btn" onclick="boardFitAll()">Fit all</button>
   </div>
   <div class="addbar"><button class="add-new" onclick="openNewJob()">+ New Job</button></div>
-  <div class="board-scroll" id="board-scroll"></div>
+  <div class="board-scroll" id="board-scroll"><div id="board-canvas"></div></div>
 </div>
 
 <!-- BOARD JOB DETAIL SCREEN -->
@@ -429,14 +437,20 @@ textarea{resize:vertical;line-height:1.6}
       <label class="fl">Description of Work</label>
       <textarea id="nj-desc" rows="3" placeholder="Describe the scope..."></textarea>
 
-      <label class="fl">Amount (optional)</label>
-      <input type="text" inputmode="decimal" id="nj-amount" placeholder="$0.00"/>
-
       <label class="fl">Status Tag (optional)</label>
       <input type="text" id="nj-tag" placeholder="e.g. PG&amp;E hold, Proposal sent"/>
 
-      <label class="fl">Contact (optional)</label>
-      <input type="text" id="nj-contact" placeholder="Name / phone"/>
+      <label class="fl">Contact Name (optional)</label>
+      <input type="text" id="nj-contact" placeholder="Name"/>
+
+      <label class="fl">Contact Phone (optional)</label>
+      <input type="tel" id="nj-contact-phone" inputmode="tel" placeholder="Phone number"/>
+
+      <label class="fl">Contact Email (optional)</label>
+      <input type="email" id="nj-contact-email" inputmode="email" placeholder="Email"/>
+
+      <label class="fl">Attachments (optional)</label>
+      <div id="nj-attachments"></div>
     </div>
     <div class="sheet-foot"><button class="save-job" onclick="saveNewJob()">Save Job</button></div>
   </div>
@@ -2079,6 +2093,9 @@ try { boardJobs = JSON.parse(localStorage.getItem('boardJobs') || '[]'); } catch
 let boardFilter = 'all';
 let expandedBoardId = null;
 let currentBoardJobId = null;
+let boardZoom = 1;
+try { boardZoom = parseFloat(localStorage.getItem('boardZoom')) || 1; } catch(e){}
+let njAttachments = [];
 
 function normalizeStage(status) {
   if (!status) return 'Inquiries';
@@ -2108,16 +2125,32 @@ function avatarFor(name) {
 // ── Board persistence (separate `board_jobs` table + localStorage cache) ──
 function saveBoardJobsLocal(){ try { localStorage.setItem('boardJobs', JSON.stringify(boardJobs)); } catch(e){} }
 
+// Contact name/phone/email are packed into the existing `contact` column as JSON,
+// so no new database columns are required.
+function packContact(j){
+  if (!(j.contact || j.contactPhone || j.contactEmail)) return '';
+  return JSON.stringify({ name: j.contact || '', phone: j.contactPhone || '', email: j.contactEmail || '' });
+}
+function unpackContact(raw){
+  if (!raw) return { contact:'', contactPhone:'', contactEmail:'' };
+  try {
+    const v = JSON.parse(raw);
+    if (v && typeof v === 'object' && ('name' in v || 'phone' in v || 'email' in v))
+      return { contact: v.name || '', contactPhone: v.phone || '', contactEmail: v.email || '' };
+  } catch(e){}
+  return { contact: String(raw), contactPhone:'', contactEmail:'' }; // legacy plain-text contact
+}
 function jobToRow(j){
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
     location:j.spaceLocation, description:j.description, amount:j.total,
-    status_tag:j.statusTag, contact:j.contact, notes:j.otherNotes,
+    status_tag:j.statusTag, contact:packContact(j), notes:j.otherNotes,
     checklist:j.checklist, attachments:j.attachments || [] };
 }
 function rowToJob(r){
   return { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
     by:r.technician||'', spaceLocation:r.location||'', description:r.description||'',
-    total:parseFloat(r.amount)||0, statusTag:r.status_tag||'', contact:r.contact||'',
+    total:parseFloat(r.amount)||0, statusTag:r.status_tag||'',
+    ...unpackContact(r.contact),
     otherNotes:r.notes||'', date:r.created_at ? String(r.created_at).slice(0,10) : '',
     checklist:Array.isArray(r.checklist)?r.checklist:[],
     attachments:Array.isArray(r.attachments)?r.attachments:[] };
@@ -2186,6 +2219,8 @@ function populateBoardDropdowns(){
 function showBoard() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-board').classList.add('active');
+  const slider = document.getElementById('board-zoom');
+  if (slider) slider.value = Math.round(boardZoom * 100);
   updateBoardCount();
   renderBoard();
 }
@@ -2200,8 +2235,6 @@ function boardCardHtml(o) {
   const col = stageColor(o.status);
   const isProj = o.type === 'project';
   const av = avatarFor(o.by);
-  const amt = parseFloat(o.total) || 0;
-  let money = amt > 0 ? '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 }) : (isProj ? '$—' : '');
   const tagHtml = o.statusTag ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
   return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
@@ -2212,7 +2245,6 @@ function boardCardHtml(o) {
     <div class="board-card-meta">
       <span class="board-ava" style="background:${av.color}">${av.initials}</span>
       ${tagHtml}
-      ${money?`<span class="board-card-amt">${money}</span>`:''}
     </div>
     ${boardDetailHtml(o)}
   </div>`;
@@ -2238,7 +2270,7 @@ function renderAtt(o, a) {
   const icon = (a.type === 'application/pdf' || /\.pdf$/i.test(a.name || '')) ? '📕' : '📄';
   return isImg
     ? `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
-    : `<div class="att att-file-tile" onclick="openAttachment(${o.id},${a.id})"><div class="att-file-icon">${icon}</div><div class="att-file-name">${escHtml(a.name)}</div><button class="att-del" onclick="event.stopPropagation();deleteAttachment(${o.id},${a.id})">×</button></div>`;
+    : `<div class="att att-file"><span class="att-name" onclick="openAttachment(${o.id},${a.id})">${icon} ${escHtml(a.name)}</span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
 }
 
 function attachmentsHtml(o) {
@@ -2376,11 +2408,12 @@ function toggleBoardCard(id) {
 
 function renderBoard() {
   const scroller = document.getElementById('board-scroll');
-  if (!scroller) return;
+  const canvas = document.getElementById('board-canvas');
+  if (!scroller || !canvas) return;
   updateBoardCount();
-  const prevScroll = scroller.scrollLeft;
+  const prevX = scroller.scrollLeft, prevY = scroller.scrollTop;
   const visible = boardJobs.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
-  scroller.innerHTML = STAGES.map(stage => {
+  canvas.innerHTML = STAGES.map(stage => {
     const cards = visible.filter(o => normalizeStage(o.status) === stage.name);
     return `<div class="board-col">
       <div class="board-col-head">
@@ -2393,7 +2426,31 @@ function renderBoard() {
       </div>
     </div>`;
   }).join('');
-  scroller.scrollLeft = prevScroll;
+  canvas.style.zoom = boardZoom;
+  scroller.scrollLeft = prevX; scroller.scrollTop = prevY;
+}
+
+// Zoom the board (see more/fewer stages at once)
+function setBoardZoom(pct) {
+  boardZoom = Math.max(0.15, (parseFloat(pct) || 100) / 100);
+  const canvas = document.getElementById('board-canvas');
+  if (canvas) canvas.style.zoom = boardZoom;
+  const slider = document.getElementById('board-zoom');
+  if (slider && slider.value != pct) slider.value = pct;
+  try { localStorage.setItem('boardZoom', String(boardZoom)); } catch(e){}
+}
+function boardFitAll() {
+  const scroller = document.getElementById('board-scroll');
+  const canvas = document.getElementById('board-canvas');
+  if (!scroller || !canvas) return;
+  canvas.style.zoom = 1;
+  const natural = canvas.scrollWidth || canvas.offsetWidth;
+  const avail = scroller.clientWidth || 360;
+  const pct = Math.max(15, Math.min(100, Math.floor((avail / natural) * 100)));
+  const slider = document.getElementById('board-zoom');
+  if (slider) slider.value = pct;
+  setBoardZoom(pct);
+  scroller.scrollLeft = 0; scroller.scrollTop = 0;
 }
 
 // ── Full-screen board job detail ──────────────────────────
@@ -2434,12 +2491,14 @@ function showBoardJob(id) {
     <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, address, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
     <label class="fl">Description</label>
     <textarea rows="3" placeholder="Describe the scope..." onchange="editBoardJobField(${o.id},'description',this.value)">${escHtml(o.description||'')}</textarea>
-    <label class="fl">Amount</label>
-    <input type="text" inputmode="decimal" value="${escHtml(amtVal)}" placeholder="$0" onchange="editBoardJobField(${o.id},'total',this.value)"/>
     <label class="fl">Status Tag</label>
     <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
-    <label class="fl">Contact</label>
-    <input type="text" value="${escHtml(o.contact||'')}" placeholder="Name / phone" onchange="editBoardJobField(${o.id},'contact',this.value)"/>
+    <label class="fl">Contact Name</label>
+    <input type="text" value="${escHtml(o.contact||'')}" placeholder="Name" onchange="editBoardJobField(${o.id},'contact',this.value)"/>
+    <label class="fl">Contact Phone</label>
+    <input type="tel" inputmode="tel" value="${escHtml(o.contactPhone||'')}" placeholder="Phone number" onchange="editBoardJobField(${o.id},'contactPhone',this.value)"/>
+    <label class="fl">Contact Email</label>
+    <input type="email" inputmode="email" value="${escHtml(o.contactEmail||'')}" placeholder="Email" onchange="editBoardJobField(${o.id},'contactEmail',this.value)"/>
     <div class="detail-card" style="margin-top:18px"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
     <div class="detail-card"><div class="detail-card-title">Checklist</div>${checklistHtml(o)}</div>
     <div class="detail-card"><div class="detail-card-title">Stage</div>
@@ -2527,11 +2586,61 @@ function njSetType(t) {
 function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
-  ['nj-space','nj-desc','nj-amount','nj-tag','nj-contact'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-phone','nj-contact-email'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
+  njAttachments = [];
+  njRenderAttachments();
   document.getElementById('nj-overlay').classList.add('show');
+}
+
+// New-job attachments held here until the job is saved
+function njRenderAttachments() {
+  const el = document.getElementById('nj-attachments');
+  if (!el) return;
+  el.innerHTML = ATT_CATS.map(cat => {
+    const items = njAttachments.filter(a => (a.category || 'Other') === cat);
+    const grid = items.map(a => {
+      const isImg = a.type && a.type.indexOf('image/') === 0;
+      const icon = (a.type === 'application/pdf' || /\.pdf$/i.test(a.name || '')) ? '📕' : '📄';
+      return isImg
+        ? `<div class="att"><img src="${a.dataUrl}" onclick="njOpenAttachment(${a.id})"/><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`
+        : `<div class="att att-file"><span class="att-name" onclick="njOpenAttachment(${a.id})">${icon} ${escHtml(a.name)}</span><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
+    }).join('');
+    return `<div class="att-cat"><div class="att-cat-label">${cat}</div>${items.length?`<div class="att-grid">${grid}</div>`:''}<label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" style="display:none" onchange="njHandleAttachmentPick(event,'${cat}')"/>📎 Add ${cat}</label></div>`;
+  }).join('');
+}
+async function njHandleAttachmentPick(ev, category) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  try {
+    let dataUrl, type = file.type || 'application/octet-stream';
+    if (type.indexOf('image/') === 0) { dataUrl = await compressImage(file, 1400, 0.7); type = 'image/jpeg'; }
+    else { if (file.size > 4 * 1024 * 1024) { alert('That file is over 4 MB. Please attach a smaller file (or a photo).'); ev.target.value=''; return; } dataUrl = await readAsDataURL(file); }
+    njAttachments.push({ id: Date.now(), name: file.name, type, category: category || 'Other', dataUrl });
+    njRenderAttachments();
+  } catch (e) { console.error('nj attachment failed:', e); alert('Sorry, that file could not be attached.'); }
+  ev.target.value = '';
+}
+function njDeleteAttachment(attId) {
+  njAttachments = njAttachments.filter(a => a.id !== attId);
+  njRenderAttachments();
+}
+function njOpenAttachment(attId) {
+  const a = njAttachments.find(x => x.id === attId);
+  if (!a) return;
+  if (a.type && a.type.indexOf('image/') === 0) {
+    document.getElementById('att-lightbox-img').src = a.dataUrl;
+    document.getElementById('att-lightbox').classList.add('show');
+    return;
+  }
+  try {
+    const url = URL.createObjectURL(dataUrlToBlob(a.dataUrl));
+    const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { console.error(e); alert('Sorry, this file could not be opened.'); }
 }
 function closeNewJob() { document.getElementById('nj-overlay').classList.remove('show'); }
 function njNewProperty() {
@@ -2549,25 +2658,27 @@ function saveNewJob() {
   if (!by) { alert('Please choose a Technician.'); return; }
   const today = new Date();
   const dateStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  const amtRaw = (document.getElementById('nj-amount').value || '').replace(/[^0-9.]/g, '');
   const stage = document.getElementById('nj-stage').value || 'Inquiries';
   const job = {
     id: Date.now(), date: dateStr, by, park,
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
-    status: stage, type: njType, checklist: [], attachments: [],
+    status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
-    otherNotes: '', total: parseFloat(amtRaw) || 0
+    contactPhone: document.getElementById('nj-contact-phone').value.trim(),
+    contactEmail: document.getElementById('nj-contact-email').value.trim(),
+    otherNotes: '', total: 0
   };
   boardJobs.unshift(job);
   persistBoardJob(job);
+  njAttachments = [];
   expandedBoardId = job.id;
   closeNewJob();
   showBoard();
   const idx = STAGES.findIndex(s => s.name === normalizeStage(stage));
-  const scroller = document.getElementById('board-scroll');
-  if (scroller && scroller.children[idx]) scroller.children[idx].scrollIntoView({ behavior:'smooth', inline:'start', block:'nearest' });
+  const canvas = document.getElementById('board-canvas');
+  if (canvas && canvas.children[idx]) canvas.children[idx].scrollIntoView({ behavior:'smooth', inline:'start', block:'nearest' });
 }
 
 // ── INIT ──────────────────────────────────────────────────
