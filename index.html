@@ -113,14 +113,22 @@ textarea{resize:vertical;line-height:1.6}
 .addbar{padding:10px 16px 2px;flex-shrink:0}
 .add-new{width:100%;border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:15px;font-weight:600;padding:12px 0;border-radius:12px;cursor:pointer;font-family:inherit}
 .add-new:active{background:#2e97f210}
-.board-zoombar{display:flex;align-items:center;gap:10px;padding:8px 16px 0;flex-shrink:0}
-.zoom-ico{font-size:13px;opacity:0.6}
-.zoom-slider{flex:1;accent-color:#05befe;height:26px}
+.board-zoombar{display:flex;align-items:center;gap:8px;padding:8px 16px 0;flex-shrink:0}
+.zoom-hint{flex:1;font-size:11px;color:#86868b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zoom-btn{border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:9px;cursor:pointer;font-family:inherit;white-space:nowrap}
-.board-scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+.board-scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;position:relative;touch-action:pan-x pan-y}
 .board-scroll::-webkit-scrollbar{height:0;width:0}
-#board-canvas{display:flex;gap:12px;padding:12px 16px 24px;align-items:flex-start;zoom:var(--board-zoom,1)}
+#board-sizer{position:relative}
+#board-canvas{position:absolute;top:0;left:0;transform-origin:top left;display:flex;gap:12px;padding:12px 16px 24px;align-items:flex-start;will-change:transform;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .board-col{flex:0 0 300px;width:300px;max-width:300px;display:flex;flex-direction:column}
+.board-card-space{font-size:12px;color:#86868b;margin-top:2px}
+/* Zoomed-out overview: show only property, space #, and description */
+#board-canvas.compact .board-card-meta,
+#board-canvas.compact .board-detail{display:none}
+#board-canvas.compact .board-card{padding:10px 11px}
+@media (orientation:landscape){
+  #screen-board.active{max-width:none}
+}
 .board-col-head{display:flex;align-items:center;gap:9px;padding:0 2px 9px;border-bottom:1px solid #e5e5ea;margin-bottom:11px;flex-shrink:0}
 .board-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 .board-col-name{font-size:16px;font-weight:700;letter-spacing:0.2px;color:#1d1d1f}
@@ -388,12 +396,12 @@ textarea{resize:vertical;line-height:1.6}
     </div>
   </div>
   <div class="board-zoombar">
-    <span class="zoom-ico">🔍</span>
-    <input type="range" class="zoom-slider" id="board-zoom" min="15" max="100" value="100" oninput="setBoardZoom(this.value)"/>
+    <span class="zoom-hint">🔍 pinch to zoom · rotate for full width</span>
+    <button class="zoom-btn" onclick="boardZoomReset()">1:1</button>
     <button class="zoom-btn" onclick="boardFitAll()">Fit all</button>
   </div>
   <div class="addbar"><button class="add-new" onclick="openNewJob()">+ New Job</button></div>
-  <div class="board-scroll" id="board-scroll"><div id="board-canvas"></div></div>
+  <div class="board-scroll" id="board-scroll"><div id="board-sizer"><div id="board-canvas"></div></div></div>
 </div>
 
 <!-- BOARD JOB DETAIL SCREEN -->
@@ -2219,8 +2227,6 @@ function populateBoardDropdowns(){
 function showBoard() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-board').classList.add('active');
-  const slider = document.getElementById('board-zoom');
-  if (slider) slider.value = Math.round(boardZoom * 100);
   updateBoardCount();
   renderBoard();
 }
@@ -2241,6 +2247,7 @@ function boardCardHtml(o) {
       <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'PROJ':'SVC'}</span>
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
     </div>
+    ${o.spaceLocation?`<div class="board-card-space">Space ${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
     <div class="board-card-meta">
       <span class="board-ava" style="background:${av.color}">${av.initials}</span>
@@ -2399,6 +2406,8 @@ function boardDetailHtml(o) {
 
 function boardCardClick(ev, id) {
   if (ev.target.closest('.board-check li, .remove-link, .board-open-link, .move-sel, .board-chk-add')) return;
+  // When zoomed out, a tap opens the full view instead of expanding inline
+  if (boardZoom < 0.6) { showBoardJob(id); return; }
   toggleBoardCard(id);
 }
 function toggleBoardCard(id) {
@@ -2426,30 +2435,40 @@ function renderBoard() {
       </div>
     </div>`;
   }).join('');
-  canvas.style.zoom = boardZoom;
+  applyBoardZoom();
   scroller.scrollLeft = prevX; scroller.scrollTop = prevY;
 }
 
-// Zoom the board (see more/fewer stages at once)
-function setBoardZoom(pct) {
-  boardZoom = Math.max(0.15, (parseFloat(pct) || 100) / 100);
+// Zoom the board via transform (scales size AND text; compact cards when small)
+function applyBoardZoom() {
   const canvas = document.getElementById('board-canvas');
-  if (canvas) canvas.style.zoom = boardZoom;
-  const slider = document.getElementById('board-zoom');
-  if (slider && slider.value != pct) slider.value = pct;
+  const sizer = document.getElementById('board-sizer');
+  if (!canvas || !sizer) return;
+  canvas.classList.toggle('compact', boardZoom < 0.6);
+  canvas.style.transform = 'scale(' + boardZoom + ')';
+  const w = canvas.scrollWidth, h = canvas.scrollHeight; // natural (unscaled) size
+  sizer.style.width = (w * boardZoom) + 'px';
+  sizer.style.height = (h * boardZoom) + 'px';
+}
+function setBoardZoom(z) {
+  boardZoom = Math.max(0.15, Math.min(1, z));
+  applyBoardZoom();
   try { localStorage.setItem('boardZoom', String(boardZoom)); } catch(e){}
+}
+function boardZoomReset() {
+  setBoardZoom(1);
+  const scroller = document.getElementById('board-scroll');
+  if (scroller) { scroller.scrollLeft = 0; scroller.scrollTop = 0; }
 }
 function boardFitAll() {
   const scroller = document.getElementById('board-scroll');
   const canvas = document.getElementById('board-canvas');
   if (!scroller || !canvas) return;
-  canvas.style.zoom = 1;
-  const natural = canvas.scrollWidth || canvas.offsetWidth;
+  canvas.classList.remove('compact');
+  canvas.style.transform = 'scale(1)';
+  const natural = canvas.scrollWidth || 1;
   const avail = scroller.clientWidth || 360;
-  const pct = Math.max(15, Math.min(100, Math.floor((avail / natural) * 100)));
-  const slider = document.getElementById('board-zoom');
-  if (slider) slider.value = pct;
-  setBoardZoom(pct);
+  setBoardZoom((avail - 6) / natural);
   scroller.scrollLeft = 0; scroller.scrollTop = 0;
 }
 
@@ -2697,6 +2716,28 @@ document.addEventListener('click', (e) => {
   const ov = document.getElementById('nj-overlay');
   if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeNewJob(); });
 })();
+// Pinch-to-zoom on the board
+(function(){
+  const scroller = document.getElementById('board-scroll');
+  if (!scroller) return;
+  let startDist = null, startZoom = 1;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  scroller.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) { startDist = dist(e.touches); startZoom = boardZoom; }
+  }, { passive: true });
+  scroller.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && startDist) {
+      e.preventDefault();
+      setBoardZoom(startZoom * (dist(e.touches) / startDist));
+    }
+  }, { passive: false });
+  scroller.addEventListener('touchend', e => { if (e.touches.length < 2) startDist = null; }, { passive: true });
+})();
+// Re-fit the sizer if the board is showing when the screen rotates
+window.addEventListener('resize', () => {
+  const b = document.getElementById('screen-board');
+  if (b && b.classList.contains('active')) applyBoardZoom();
+});
 populateDropdowns();
 renderMaterials();
 renderTestingServices();
