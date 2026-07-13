@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: permit-prompt -->
+<!-- build: permit-inq-approved -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2571,8 +2571,9 @@ let permitJobId = null;
 function moveBoardStage(id, stage) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  // Moving Approved → Ready to Schedule: ask whether a permit is required first
-  if (normalizeStage(o.status) === 'Approved' && stage === 'Ready to Schedule') {
+  // Moving Inquiries/Approved → Ready to Schedule: ask whether a permit is required first
+  const fromStage = normalizeStage(o.status);
+  if ((fromStage === 'Approved' || fromStage === 'Inquiries') && stage === 'Ready to Schedule') {
     permitJobId = id;
     document.getElementById('permit-overlay').style.display = 'flex';
     return; // answerPermit() sets the final stage
