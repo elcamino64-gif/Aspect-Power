@@ -104,7 +104,8 @@ textarea{resize:vertical;line-height:1.6}
 .manage-mat-delete{background:none;border:none;color:#ff3b30;font-size:13px;font-weight:600;cursor:pointer;padding:6px 10px;flex-shrink:0}
 /* ── JOB BOARD (separate from Orders) ──────────────────── */
 #screen-board.active{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.board-toolbar{padding:14px 16px 2px;flex-shrink:0;display:flex;align-items:center;gap:12px}
+#screen-board .header{position:relative;z-index:1}
+.board-toolbar{padding:20px 16px 2px;flex-shrink:0;display:flex;align-items:center;gap:12px}
 .seg{display:flex;gap:8px;flex:1}
 .seg button{flex:1;border:1px solid #d2d2d7;background:#fff;color:#3a3a3c;font-size:13.5px;font-weight:600;padding:9px 0;border-radius:11px;cursor:pointer;font-family:inherit;transition:0.12s}
 .seg button.on{background:#05befe;border-color:#05befe;color:#fff}
@@ -182,6 +183,10 @@ textarea{resize:vertical;line-height:1.6}
 .att-cat{margin-bottom:14px}
 .att-cat:last-child{margin-bottom:0}
 .att-cat-label{font-size:11px;font-weight:700;letter-spacing:0.3px;color:#3a3a3c;margin-bottom:7px}
+.att-file-tile{position:relative;width:84px;height:84px;border:1px solid #d2d2d7;border-radius:10px;background:#f5f5f7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:6px}
+.att-file-icon{font-size:26px;line-height:1}
+.att-file-name{font-size:9px;color:#3a3a3c;text-align:center;line-height:1.15;max-height:22px;overflow:hidden;width:100%;word-break:break-word}
+.bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
 .att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
 .att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
@@ -409,8 +414,8 @@ textarea{resize:vertical;line-height:1.6}
       <label class="fl">Stage</label>
       <select id="nj-stage"></select>
 
-      <label class="fl">Technician</label>
-      <select id="nj-by"><option value="">Select technician...</option></select>
+      <label class="fl">Added By</label>
+      <select id="nj-by"><option value="">Select...</option></select>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -2230,9 +2235,10 @@ const ATT_CATS = ['Contract', 'Permit', 'Other'];
 
 function renderAtt(o, a) {
   const isImg = a.type && a.type.indexOf('image/') === 0;
+  const icon = (a.type === 'application/pdf' || /\.pdf$/i.test(a.name || '')) ? '📕' : '📄';
   return isImg
     ? `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
-    : `<div class="att att-file"><span class="att-name" onclick="openAttachment(${o.id},${a.id})">📄 ${escHtml(a.name)}</span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
+    : `<div class="att att-file-tile" onclick="openAttachment(${o.id},${a.id})"><div class="att-file-icon">${icon}</div><div class="att-file-name">${escHtml(a.name)}</div><button class="att-del" onclick="event.stopPropagation();deleteAttachment(${o.id},${a.id})">×</button></div>`;
 }
 
 function attachmentsHtml(o) {
@@ -2405,17 +2411,36 @@ function showBoardJob(id) {
   const isProj = o.type === 'project';
   const amt = parseFloat(o.total) || 0;
   const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
+  const techList = technicians.slice();
+  if (o.by && !techList.includes(o.by)) techList.unshift(o.by);
+  const techOpts = techList.map(t => `<option value="${escHtml(t)}"${t===o.by?' selected':''}>${escHtml(t)}</option>`).join('');
+  const parkList = properties.slice();
+  if (o.park && !parkList.includes(o.park)) parkList.unshift(o.park);
+  const parkOpts = '<option value="">Select property...</option>' +
+    parkList.map(pn => `<option value="${escHtml(pn)}"${pn===o.park?' selected':''}>${escHtml(pn)}</option>`).join('');
+  const amtVal = amt > 0 ? '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
   document.getElementById('boardjob-content').innerHTML = `
-    <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">${isProj?'Project':'Service call'}</span></div>
-    ${o.date?`<div class="detail-row"><span class="detail-label">Added</span><span class="detail-value">${fmtDate(o.date)}</span></div>`:''}
-    <div class="detail-row"><span class="detail-label">Technician</span><span class="detail-value">${escHtml(o.by||'—')}</span></div>
-    <div class="detail-row"><span class="detail-label">Park / Property</span><span class="detail-value">${escHtml(o.park||'—')}</span></div>
-    <div class="detail-row"><span class="detail-label">Space / Location</span><span class="detail-value">${escHtml(o.spaceLocation||'—')}</span></div>
-    ${o.contact?`<div class="detail-row"><span class="detail-label">Contact</span><span class="detail-value">${escHtml(o.contact)}</span></div>`:''}
-    ${amt>0?`<div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">$${amt.toLocaleString('en-US',{maximumFractionDigits:0})}</span></div>`:''}
-    ${o.description?`<div class="detail-card"><div class="detail-card-title">Description</div><div class="detail-card-text">${escHtml(o.description)}</div></div>`:''}
-    ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${escHtml(o.otherNotes)}</div></div>`:''}
-    <div class="detail-card"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
+    <label class="fl" style="margin-top:0">Type</label>
+    <div class="typetoggle">
+      <button type="button" class="${isProj?'on':''}" onclick="editBoardJobField(${o.id},'type','project')">Project</button>
+      <button type="button" class="${!isProj?'on':''}" onclick="editBoardJobField(${o.id},'type','service')">Service Call</button>
+    </div>
+    ${o.date?`<label class="fl">Added</label><div class="bj-static">${fmtDate(o.date)}</div>`:''}
+    <label class="fl">Added By</label>
+    <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
+    <label class="fl">Park / Property</label>
+    <select onchange="editBoardJobField(${o.id},'park',this.value)">${parkOpts}</select>
+    <label class="fl">Space / Location</label>
+    <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, address, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
+    <label class="fl">Description</label>
+    <textarea rows="3" placeholder="Describe the scope..." onchange="editBoardJobField(${o.id},'description',this.value)">${escHtml(o.description||'')}</textarea>
+    <label class="fl">Amount</label>
+    <input type="text" inputmode="decimal" value="${escHtml(amtVal)}" placeholder="$0" onchange="editBoardJobField(${o.id},'total',this.value)"/>
+    <label class="fl">Status Tag</label>
+    <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
+    <label class="fl">Contact</label>
+    <input type="text" value="${escHtml(o.contact||'')}" placeholder="Name / phone" onchange="editBoardJobField(${o.id},'contact',this.value)"/>
+    <div class="detail-card" style="margin-top:18px"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
     <div class="detail-card"><div class="detail-card-title">Checklist</div>${checklistHtml(o)}</div>
     <div class="detail-card"><div class="detail-card-title">Stage</div>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
@@ -2424,6 +2449,16 @@ function showBoardJob(id) {
     <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:10px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
+}
+
+// Edit a single field on a board job (auto-saves). Only 'type' needs a re-render.
+function editBoardJobField(id, field, value) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  if (field === 'total') o.total = parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
+  else o[field] = value;
+  persistBoardJob(o);
+  if (field === 'type') showBoardJob(id);
 }
 
 function saveBoardJobDone(id) {
