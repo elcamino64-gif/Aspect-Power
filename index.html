@@ -1665,24 +1665,51 @@ function showDetail(id) {
   const assistLines = (o.techAssist||[]).filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
   const labLines = o.laborers.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
 
+  const isService = (o.type || 'service') === 'service';
+  const isProj = !isService;
+  const checklist = Array.isArray(o.checklist) ? o.checklist : [];
+  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
+  const chkItems = checklist.length
+    ? checklist.map((c,i)=>`<li class="${c.done?'done':''}" onclick="toggleChecklistItem(${o.id},${i})"><span class="board-box ${c.done?'done':''}">${c.done?'✓':''}</span><span class="cklabel">${escHtml(c.label)}</span><button class="board-chk-del" onclick="event.stopPropagation();removeChecklistItem(${o.id},${i})">×</button></li>`).join('')
+    : '<li style="color:#c7c7cc;font-style:italic;cursor:default">No items yet</li>';
+  const trackedAmt = (parseFloat(o.total)||0) > 0 ? '$' + (parseFloat(o.total)||0).toLocaleString('en-US',{maximumFractionDigits:0}) : '';
+
   el.innerHTML = `
+    <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">${isProj?'Project':'Service call'}</span></div>
     <div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${fmtDate(o.date)}</span></div>
     <div class="detail-row"><span class="detail-label">Technician</span><span class="detail-value">${o.by||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">Park / Property</span><span class="detail-value">${o.park||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">Space / Location</span><span class="detail-value">${o.spaceLocation||'—'}</span></div>
+    ${o.contact?`<div class="detail-row"><span class="detail-label">Contact</span><span class="detail-value">${escHtml(o.contact)}</span></div>`:''}
     ${o.description?`<div class="detail-card"><div class="detail-card-title">Description</div><div class="detail-card-text">${o.description}</div></div>`:''}
+    <div class="detail-card"><div class="detail-card-title">Billing</div>
+      <div class="detail-card-text">${billingPath(o.type)}</div>
+      ${(isProj && trackedAmt)?`<div class="detail-row" style="border:none;padding:8px 0 0"><span class="detail-label">Tracked amount</span><span class="detail-value">${trackedAmt}</span></div>`:''}
+    </div>
     ${matLines?`<div class="detail-card"><div class="detail-card-title">Materials</div>${matLines}</div>`:''}
     ${testLinesList?`<div class="detail-card"><div class="detail-card-title">Testing Services</div>${testLinesList}</div>`:''}
     ${techLines?`<div class="detail-card"><div class="detail-card-title">Technical Labor</div>${techLines}</div>`:''}
     ${assistLines?`<div class="detail-card"><div class="detail-card-title">Technicians Assistant</div>${assistLines}</div>`:''}
     ${labLines?`<div class="detail-card"><div class="detail-card-title">Laborer</div>${labLines}</div>`:''}
-    <div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${o.fuelVehicles||1} vehicle(s)</span><span class="detail-value" style="color:#86868b">$0.75/mile – office calculates</span></div></div>
     ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${o.otherNotes}</div></div>`:''}
+    <div class="detail-card"><div class="detail-card-title">Checklist</div>
+      <ul class="board-check">${chkItems}</ul>
+      <div class="board-chk-add">
+        <input id="chk-input-${o.id}" placeholder="Add checklist item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem(${o.id})}"/>
+        <button class="btn-ghost" onclick="addChecklistItem(${o.id})">Add</button>
+      </div>
+    </div>
+    <div class="detail-card"><div class="detail-card-title">Stage</div>
+      <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
+    </div>
+    ${isService ? `
+    <div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${o.fuelVehicles||1} vehicle(s)</span><span class="detail-value" style="color:#86868b">$0.75/mile – office calculates</span></div></div>
     <div class="total-box" style="margin-top:16px">
       <span class="total-label">Total</span>
-      <span class="total-amount">$${o.total.toFixed(2)}</span>
+      <span class="total-amount">$${(parseFloat(o.total)||0).toFixed(2)}</span>
     </div>
     <button class="btn-primary" onclick="sendOrder(${o.id})" style="margin-top:0">📧 Send</button>
+    ` : ''}
     <div style="height:32px"></div>
   `;
 }
@@ -2242,6 +2269,14 @@ function toggleBoardCard(id) {
   renderBoard();
 }
 
+// Re-render whichever board-connected view is currently on screen
+function refreshBoardViews() {
+  const b = document.getElementById('screen-board');
+  const d = document.getElementById('screen-detail');
+  if (b && b.classList.contains('active')) renderBoard();
+  if (d && d.classList.contains('active') && currentOrderId != null) showDetail(currentOrderId);
+}
+
 // Persist an updated existing order (localStorage + cloud upsert)
 function persistOrder(o) {
   try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
@@ -2254,7 +2289,7 @@ function moveBoardStage(id, stage) {
   if (!o) return;
   o.status = stage;
   persistOrder(o);
-  renderBoard();
+  refreshBoardViews();
 }
 
 function toggleChecklistItem(id, i) {
@@ -2262,7 +2297,7 @@ function toggleChecklistItem(id, i) {
   if (!o || !Array.isArray(o.checklist) || !o.checklist[i]) return;
   o.checklist[i].done = !o.checklist[i].done;
   persistOrder(o);
-  renderBoard();
+  refreshBoardViews();
 }
 
 function addChecklistItem(id) {
@@ -2274,7 +2309,7 @@ function addChecklistItem(id) {
   if (!Array.isArray(o.checklist)) o.checklist = [];
   o.checklist.push({ label, done: false });
   persistOrder(o);
-  renderBoard();
+  refreshBoardViews();
 }
 
 function removeChecklistItem(id, i) {
@@ -2282,7 +2317,7 @@ function removeChecklistItem(id, i) {
   if (!o || !Array.isArray(o.checklist)) return;
   o.checklist.splice(i, 1);
   persistOrder(o);
-  renderBoard();
+  refreshBoardViews();
 }
 
 function removeBoardJob(id) {
