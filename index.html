@@ -102,8 +102,7 @@ textarea{resize:vertical;line-height:1.6}
 .manage-mat-name{font-size:14px;color:#1d1d1f;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .manage-mat-cost{font-size:12px;color:#86868b}
 .manage-mat-delete{background:none;border:none;color:#ff3b30;font-size:13px;font-weight:600;cursor:pointer;padding:6px 10px;flex-shrink:0}
-.status-btn.active-type{background:#05befe18;border-color:#05befe;color:#0a84c9}
-/* ── JOB BOARD ─────────────────────────────────────────── */
+/* ── JOB BOARD (separate from Orders) ──────────────────── */
 #screen-board.active{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .board-toolbar{padding:14px 16px 2px;flex-shrink:0;display:flex;align-items:center;gap:12px}
 .seg{display:flex;gap:8px;flex:1}
@@ -130,7 +129,6 @@ textarea{resize:vertical;line-height:1.6}
 .board-badge-proj{background:#e5f1fd;color:#1e7fd8}
 .board-badge-svc{background:#ececef;color:#6a6a6e}
 .board-card-park{font-size:15px;font-weight:600;line-height:1.2;color:#1d1d1f}
-.board-jobno{margin-left:auto;font-size:11px;color:#86868b;font-weight:500;white-space:nowrap}
 .board-card-scope{font-size:13px;color:#3a3a3c;line-height:1.4}
 .board-card-meta{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}
 .board-ava{width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -157,7 +155,6 @@ textarea{resize:vertical;line-height:1.6}
 .board-actions{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
 .board-open-link{background:none;border:none;color:#2e97f2;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;padding:2px}
 .remove-link{background:none;border:none;color:#ff3b30;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;padding:2px}
-/* New-job bottom sheet */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.32);display:none;align-items:flex-end;justify-content:center;z-index:50}
 .overlay.show{display:flex}
 .sheet{background:#f5f5f7;width:100%;max-width:480px;border-radius:20px 20px 0 0;max-height:92vh;display:flex;flex-direction:column;animation:sheetup 0.22s ease}
@@ -176,6 +173,20 @@ textarea{resize:vertical;line-height:1.6}
 .typetoggle button.on{background:#05befe;border-color:#05befe;color:#fff}
 .sheet-foot{padding:12px 18px calc(18px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e5e5ea}
 .save-job{width:100%;background:#05befe;border:none;color:#fff;font-size:16px;font-weight:600;padding:14px 0;border-radius:13px;cursor:pointer;font-family:inherit}
+/* Attachments */
+.att-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px}
+.att{position:relative;width:84px}
+.att img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid #d2d2d7;cursor:pointer;display:block}
+.att-file{width:100%;display:flex;align-items:center;gap:8px;background:#f5f5f7;border:1px solid #e5e5ea;border-radius:10px;padding:10px 12px}
+.att-file a{flex:1;color:#1d1d1f;font-size:13px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
+.att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
+.att-empty{font-size:12.5px;color:#c7c7cc;font-style:italic}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.lightbox.show{display:flex}
+.lightbox img{max-width:100%;max-height:90vh;border-radius:8px}
+.lightbox-close{position:absolute;top:16px;right:20px;color:#fff;font-size:34px;background:none;border:none;cursor:pointer;line-height:1}
 </style>
 </head>
 <body>
@@ -298,13 +309,10 @@ textarea{resize:vertical;line-height:1.6}
 
     <div class="section">
       <div class="section-title">Status & Notes</div>
-      <label class="field-label">Job Type</label>
-      <div class="status-btns" style="margin-bottom:14px">
-        <button type="button" class="status-btn" id="btn-type-service" onclick="setJobType('service')">Service Call</button>
-        <button type="button" class="status-btn" id="btn-type-project" onclick="setJobType('project')">Project</button>
+      <div class="status-btns">
+        <button class="status-btn" id="btn-complete" onclick="toggleStatus('Complete')">Complete</button>
+        <button class="status-btn" id="btn-inprogress" onclick="toggleStatus('In Progress')">In Progress</button>
       </div>
-      <label class="field-label">Stage</label>
-      <select id="f-stage" style="margin-bottom:14px"></select>
       <textarea id="f-notes" rows="3" placeholder="Other notes..."></textarea>
     </div>
 
@@ -351,13 +359,13 @@ textarea{resize:vertical;line-height:1.6}
   <div class="scroll" id="detail-content"></div>
 </div>
 
-<!-- JOB BOARD SCREEN -->
+<!-- JOB BOARD SCREEN (separate from Orders) -->
 <div id="screen-board" class="screen">
   <div class="header">
     <div class="logo-bar" data-logo></div>
     <div class="nav-bar">
-      <div></div>
-      <button class="btn-ghost" onclick="showList()">Orders (<span id="board-order-count">0</span>)</button>
+      <button class="btn-ghost" onclick="showForm()">← Orders</button>
+      <span style="font-size:12px;color:#86868b" id="board-count">0 jobs</span>
     </div>
   </div>
   <div class="board-toolbar">
@@ -370,6 +378,18 @@ textarea{resize:vertical;line-height:1.6}
   </div>
   <div class="addbar"><button class="add-new" onclick="openNewJob()">+ New Job</button></div>
   <div class="board-scroll" id="board-scroll"></div>
+</div>
+
+<!-- BOARD JOB DETAIL SCREEN -->
+<div id="screen-boardjob" class="screen">
+  <div class="header">
+    <div class="logo-bar" data-logo></div>
+    <div class="nav-bar">
+      <button class="btn-ghost" onclick="showBoard()">← Board</button>
+      <span class="status-badge" id="boardjob-status-badge"></span>
+    </div>
+  </div>
+  <div class="scroll" id="boardjob-content"></div>
 </div>
 
 <!-- NEW JOB bottom sheet -->
@@ -412,6 +432,12 @@ textarea{resize:vertical;line-height:1.6}
     </div>
     <div class="sheet-foot"><button class="save-job" onclick="saveNewJob()">Save Job</button></div>
   </div>
+</div>
+
+<!-- Image attachment lightbox -->
+<div class="lightbox" id="att-lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <img id="att-lightbox-img" src="" alt="attachment"/>
 </div>
 
 <script>
@@ -562,11 +588,7 @@ async function loadCloudData() {
         fuelVehicles: o.fuel_vehicles,
         status: o.status,
         otherNotes: o.other_notes,
-        total: parseFloat(o.total) || 0,
-        type: (o.board && o.board.type) || 'service',
-        checklist: (o.board && Array.isArray(o.board.checklist)) ? o.board.checklist : [],
-        statusTag: (o.board && o.board.statusTag) || '',
-        contact: (o.board && o.board.contact) || ''
+        total: parseFloat(o.total) || 0
       }));
       // Extract properties and techs from work orders as fallback
       wo.forEach(o => {
@@ -623,33 +645,7 @@ async function loadCloudData() {
 
 async function saveOrderToCloud(order) {
   console.log('Saving order to cloud:', order.id);
-  const base = {
-    id: order.id,
-    date: order.date,
-    by: order.by,
-    park: order.park,
-    space_location: order.spaceLocation,
-    description: order.description,
-    materials: order.materials,
-    testing: order.testing || [],
-    tech_labor: order.techLabor,
-    tech_assist: order.techAssist,
-    laborers: order.laborers,
-    fuel_vehicles: order.fuelVehicles,
-    status: order.status,
-    other_notes: order.otherNotes,
-    total: order.total
-  };
-  // Board metadata lives in a single JSONB column `board`. If that column
-  // hasn't been added to the table yet, the insert would fail — so we retry
-  // once without it, keeping the core work order (and its stage) saving.
-  const withBoard = { ...base, board: {
-    type: order.type || 'service',
-    checklist: order.checklist || [],
-    statusTag: order.statusTag || '',
-    contact: order.contact || ''
-  }};
-  const doPost = (payload) => fetch(SUPABASE_URL + '/rest/v1/work_orders', {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/work_orders', {
     method: 'POST',
     headers: {
       'apikey': SUPABASE_KEY,
@@ -657,20 +653,26 @@ async function saveOrderToCloud(order) {
       'Content-Type': 'application/json',
       'Prefer': 'resolution=merge-duplicates,return=minimal'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      id: order.id,
+      date: order.date,
+      by: order.by,
+      park: order.park,
+      space_location: order.spaceLocation,
+      description: order.description,
+      materials: order.materials,
+      testing: order.testing || [],
+      tech_labor: order.techLabor,
+      tech_assist: order.techAssist,
+      laborers: order.laborers,
+      fuel_vehicles: order.fuelVehicles,
+      status: order.status,
+      other_notes: order.otherNotes,
+      total: order.total
+    })
   });
-  try {
-    let res = await doPost(withBoard);
-    if (!res.ok) {
-      const txt = await res.text();
-      console.warn('saveOrderToCloud with board failed, retrying without board column:', res.status, txt);
-      res = await doPost(base);
-    }
-    const txt = await res.text();
-    console.log('saveOrderToCloud response:', res.status, txt);
-  } catch (e) {
-    console.error('saveOrderToCloud network error (saved locally):', e);
-  }
+  const txt = await res.text();
+  console.log('saveOrderToCloud response:', res.status, txt);
 }
 
 async function deleteOrderFromCloud(id) {
@@ -733,33 +735,6 @@ async function saveTechToCloud(name) {
 // ── STATE ─────────────────────────────────────────────────
 let orders = [];
 let currentStatus = '';
-let currentType = 'service';
-
-// ── JOB BOARD: stages (columns) ───────────────────────────
-const STAGES = [
-  { name: 'Inquiries',                 color: '#86868B' },
-  { name: 'Quoted',                    color: '#2E97F2' },
-  { name: 'Permit Pending',            color: '#F5A623' },
-  { name: 'Ready to Schedule',         color: '#12B5AE' },
-  { name: 'In Progress',               color: '#8257E6' },
-  { name: 'Inspection / PG&E',         color: '#FF8A3D' },
-  { name: 'Complete — Ready to Bill',  color: '#34C759' }
-];
-let boardFilter = 'all';
-let expandedBoardId = null;
-
-// Map any stored status (including legacy "Complete"/"In Progress"/blank) to a stage name
-function normalizeStage(status) {
-  if (!status) return 'Inquiries';
-  if (STAGES.some(s => s.name === status)) return status;
-  if (status === 'Complete') return 'Complete — Ready to Bill';
-  if (status === 'In Progress') return 'In Progress';
-  return 'Inquiries';
-}
-function stageColor(status) {
-  const st = STAGES.find(s => s.name === normalizeStage(status));
-  return st ? st.color : '#86868B';
-}
 let materials = [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
 let techLabor = [{rate:'225',hours:'',type:'RT'}];
 let techAssist = [{rate:'150',hours:'',type:'RT'}];
@@ -942,31 +917,6 @@ function populateDropdowns() {
   const defaultTech = curTech || (technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : '');
   techSel.innerHTML = '<option value="">Select technician...</option>' +
     technicians.map(t => `<option value="${t}"${t===defaultTech?' selected':''}>${t}</option>`).join('');
-
-  // Stage pickers (main form + new-job form)
-  const stageOpts = STAGES.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-  const fStage = document.getElementById('f-stage');
-  if (fStage) { const cur = fStage.value; fStage.innerHTML = stageOpts; fStage.value = cur || 'Inquiries'; }
-  const njStage = document.getElementById('nj-stage');
-  if (njStage) { const cur = njStage.value; njStage.innerHTML = stageOpts; njStage.value = cur || 'Inquiries'; }
-
-  // New-job form: live property + technician dropdowns (same source as main form)
-  const njPark = document.getElementById('nj-park');
-  if (njPark) { const cur = njPark.value;
-    njPark.innerHTML = '<option value="">Select property...</option>' +
-      properties.map(p => `<option value="${p}"${p===cur?' selected':''}>${p}</option>`).join('');
-  }
-  const njBy = document.getElementById('nj-by');
-  if (njBy) { const cur = njBy.value;
-    njBy.innerHTML = '<option value="">Select technician...</option>' +
-      technicians.map(t => `<option value="${t}"${t===cur?' selected':''}>${t}</option>`).join('');
-  }
-}
-
-function setJobType(t) {
-  currentType = t;
-  document.getElementById('btn-type-service').className = 'status-btn' + (t==='service'?' active-type':'');
-  document.getElementById('btn-type-project').className = 'status-btn' + (t==='project'?' active-type':'');
 }
 
 function handleParkChange(val) {
@@ -1561,10 +1511,10 @@ function setType(type, i, t) {
 }
 
 // ── STATUS ────────────────────────────────────────────────
-// Kept for backwards-compatibility; the form now uses the Stage picker (#f-stage).
 function toggleStatus(s) {
-  const sel = document.getElementById('f-stage');
-  if (sel) sel.value = normalizeStage(s);
+  currentStatus = currentStatus === s ? '' : s;
+  document.getElementById('btn-complete').className = 'status-btn' + (currentStatus==='Complete'?' complete':'');
+  document.getElementById('btn-inprogress').className = 'status-btn' + (currentStatus==='In Progress'?' inprogress':'');
 }
 
 // ── SAVE ──────────────────────────────────────────────────
@@ -1587,11 +1537,7 @@ function saveOrder() {
     techAssist: techAssist.map(r=>({...r})),
     laborers: laborers.map(r=>({...r})),
     fuelVehicles: document.getElementById('f-vehicles').value,
-    status: document.getElementById('f-stage').value || 'Inquiries',
-    type: currentType,
-    checklist: [],
-    statusTag: '',
-    contact: '',
+    status: currentStatus,
     otherNotes: document.getElementById('f-notes').value,
     total: calcTotal()
   };
@@ -1622,9 +1568,8 @@ function resetForm() {
   techAssist = [{rate:'150',hours:'',type:'RT'}];
   laborers = [{rate:'150',hours:'',type:'RT'}];
   currentStatus = '';
-  const fStage = document.getElementById('f-stage');
-  if (fStage) fStage.value = 'Inquiries';
-  setJobType('service');
+  document.getElementById('btn-complete').className = 'status-btn';
+  document.getElementById('btn-inprogress').className = 'status-btn';
   renderMaterials();
   renderTestingServices();
   renderLabor();
@@ -1652,11 +1597,8 @@ function showDetail(id) {
   document.getElementById('screen-detail').classList.add('active');
   // Status badge
   const badge = document.getElementById('detail-status-badge');
-  const stg = normalizeStage(o.status);
-  badge.textContent = stg;
-  badge.className = 'status-badge';
-  badge.style.color = stageColor(o.status);
-  badge.style.background = stageColor(o.status) + '18';
+  badge.textContent = o.status || '';
+  badge.className = 'status-badge ' + (o.status==='Complete'?'badge-complete':o.status==='In Progress'?'badge-inprogress':'badge-none');
 
   const el = document.getElementById('detail-content');
   const testLinesList = (o.testing||[]).filter(t=>t.service||t.cost).map(t=>`<div class="detail-row"><span class="detail-label">${t.service||'—'}</span><span class="detail-value">$${parseFloat(t.cost||0).toFixed(2)}</span></div>`).join('');
@@ -1665,51 +1607,24 @@ function showDetail(id) {
   const assistLines = (o.techAssist||[]).filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
   const labLines = o.laborers.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
 
-  const isService = (o.type || 'service') === 'service';
-  const isProj = !isService;
-  const checklist = Array.isArray(o.checklist) ? o.checklist : [];
-  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
-  const chkItems = checklist.length
-    ? checklist.map((c,i)=>`<li class="${c.done?'done':''}" onclick="toggleChecklistItem(${o.id},${i})"><span class="board-box ${c.done?'done':''}">${c.done?'✓':''}</span><span class="cklabel">${escHtml(c.label)}</span><button class="board-chk-del" onclick="event.stopPropagation();removeChecklistItem(${o.id},${i})">×</button></li>`).join('')
-    : '<li style="color:#c7c7cc;font-style:italic;cursor:default">No items yet</li>';
-  const trackedAmt = (parseFloat(o.total)||0) > 0 ? '$' + (parseFloat(o.total)||0).toLocaleString('en-US',{maximumFractionDigits:0}) : '';
-
   el.innerHTML = `
-    <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">${isProj?'Project':'Service call'}</span></div>
     <div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${fmtDate(o.date)}</span></div>
     <div class="detail-row"><span class="detail-label">Technician</span><span class="detail-value">${o.by||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">Park / Property</span><span class="detail-value">${o.park||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">Space / Location</span><span class="detail-value">${o.spaceLocation||'—'}</span></div>
-    ${o.contact?`<div class="detail-row"><span class="detail-label">Contact</span><span class="detail-value">${escHtml(o.contact)}</span></div>`:''}
     ${o.description?`<div class="detail-card"><div class="detail-card-title">Description</div><div class="detail-card-text">${o.description}</div></div>`:''}
-    <div class="detail-card"><div class="detail-card-title">Billing</div>
-      <div class="detail-card-text">${billingPath(o.type)}</div>
-      ${(isProj && trackedAmt)?`<div class="detail-row" style="border:none;padding:8px 0 0"><span class="detail-label">Tracked amount</span><span class="detail-value">${trackedAmt}</span></div>`:''}
-    </div>
     ${matLines?`<div class="detail-card"><div class="detail-card-title">Materials</div>${matLines}</div>`:''}
     ${testLinesList?`<div class="detail-card"><div class="detail-card-title">Testing Services</div>${testLinesList}</div>`:''}
     ${techLines?`<div class="detail-card"><div class="detail-card-title">Technical Labor</div>${techLines}</div>`:''}
     ${assistLines?`<div class="detail-card"><div class="detail-card-title">Technicians Assistant</div>${assistLines}</div>`:''}
     ${labLines?`<div class="detail-card"><div class="detail-card-title">Laborer</div>${labLines}</div>`:''}
-    ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${o.otherNotes}</div></div>`:''}
-    <div class="detail-card"><div class="detail-card-title">Checklist</div>
-      <ul class="board-check">${chkItems}</ul>
-      <div class="board-chk-add">
-        <input id="chk-input-${o.id}" placeholder="Add checklist item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem(${o.id})}"/>
-        <button class="btn-ghost" onclick="addChecklistItem(${o.id})">Add</button>
-      </div>
-    </div>
-    <div class="detail-card"><div class="detail-card-title">Stage</div>
-      <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
-    </div>
-    ${isService ? `
     <div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${o.fuelVehicles||1} vehicle(s)</span><span class="detail-value" style="color:#86868b">$0.75/mile – office calculates</span></div></div>
+    ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${o.otherNotes}</div></div>`:''}
     <div class="total-box" style="margin-top:16px">
       <span class="total-label">Total</span>
-      <span class="total-amount">$${(parseFloat(o.total)||0).toFixed(2)}</span>
+      <span class="total-amount">$${o.total.toFixed(2)}</span>
     </div>
     <button class="btn-primary" onclick="sendOrder(${o.id})" style="margin-top:0">📧 Send</button>
-    ` : ''}
     <div style="height:32px"></div>
   `;
 }
@@ -1729,8 +1644,7 @@ function renderList() {
     return;
   }
   el.innerHTML = filtered.map(o => {
-    const stg = normalizeStage(o.status);
-    const col = stageColor(o.status);
+    const badge = o.status==='Complete'?'badge-complete':o.status==='In Progress'?'badge-inprogress':'badge-none';
     return `
     <div class="order-card" id="card-${o.id}">
       <div class="order-card-delete" onclick="deleteOrder(${o.id})">
@@ -1747,7 +1661,7 @@ function renderList() {
         </div>
         <div class="order-row">
           <span class="order-meta">${o.by||''} · ${fmtDate(o.date)}</span>
-          <span class="status-badge" style="color:${col};background:${col}18">${stg}</span>
+          <span class="status-badge ${badge}">${o.status||'—'}</span>
         </div>
       </div>
     </div>`;
@@ -2142,32 +2056,39 @@ function updateOrderCount() {
   btn.style.display = orders.length > 0 ? 'block' : 'none';
 }
 
-// ── JOB BOARD ─────────────────────────────────────────────
+// ══ JOB BOARD (its own data, separate from Orders / work_orders) ══════════
+const STAGES = [
+  { name: 'Inquiries',                 color: '#86868B' },
+  { name: 'Quoted',                    color: '#2E97F2' },
+  { name: 'Permit Pending',            color: '#F5A623' },
+  { name: 'Ready to Schedule',         color: '#12B5AE' },
+  { name: 'In Progress',               color: '#8257E6' },
+  { name: 'Inspection / PG&E',         color: '#FF8A3D' },
+  { name: 'Complete — Ready to Bill',  color: '#34C759' }
+];
+let boardJobs = [];
+try { boardJobs = JSON.parse(localStorage.getItem('boardJobs') || '[]'); } catch(e){}
+let boardFilter = 'all';
+let expandedBoardId = null;
+let currentBoardJobId = null;
+
+function normalizeStage(status) {
+  if (!status) return 'Inquiries';
+  if (STAGES.some(s => s.name === status)) return status;
+  if (status === 'Complete') return 'Complete — Ready to Bill';
+  return 'Inquiries';
+}
+function stageColor(status) {
+  const st = STAGES.find(s => s.name === normalizeStage(status));
+  return st ? st.color : '#86868B';
+}
+function billingPath(type) {
+  return type === 'project' ? 'Better Proposals → QuickBooks' : 'In-app — service invoice';
+}
 function escHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-function showBoard() {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-board').classList.add('active');
-  renderBoard();
-}
-
-function setBoardFilter(f) {
-  boardFilter = f;
-  const map = { all:0, project:1, service:2 };
-  document.querySelectorAll('#board-seg button').forEach((b, i) => b.classList.toggle('on', i === map[f]));
-  renderBoard();
-}
-
-function billingPath(type) {
-  return type === 'project'
-    ? 'Better Proposals → QuickBooks'
-    : 'In-app — service invoice';
-}
-
-// Initials + color for a technician's avatar (matches the mockup's coloring)
 function avatarFor(name) {
-  const n = (name || '').trim();
-  const parts = n.split(/\s+/).filter(Boolean);
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
   let initials = '?';
   if (parts.length >= 2) initials = (parts[0][0] + parts[1][0]).toUpperCase();
   else if (parts.length === 1) initials = parts[0].slice(0, 2).toUpperCase();
@@ -2176,16 +2097,104 @@ function avatarFor(name) {
   return { initials, color };
 }
 
+// ── Board persistence (separate `board_jobs` table + localStorage cache) ──
+function saveBoardJobsLocal(){ try { localStorage.setItem('boardJobs', JSON.stringify(boardJobs)); } catch(e){} }
+
+function jobToRow(j){
+  return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
+    location:j.spaceLocation, description:j.description, amount:j.total,
+    status_tag:j.statusTag, contact:j.contact, notes:j.otherNotes,
+    checklist:j.checklist, attachments:j.attachments || [] };
+}
+function rowToJob(r){
+  return { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
+    by:r.technician||'', spaceLocation:r.location||'', description:r.description||'',
+    total:parseFloat(r.amount)||0, statusTag:r.status_tag||'', contact:r.contact||'',
+    otherNotes:r.notes||'', date:r.created_at ? String(r.created_at).slice(0,10) : '',
+    checklist:Array.isArray(r.checklist)?r.checklist:[],
+    attachments:Array.isArray(r.attachments)?r.attachments:[] };
+}
+
+async function loadBoardJobsFromCloud(){
+  try {
+    const rows = await sbFetch('board_jobs?order=created_at.desc');
+    if (rows && rows.length !== undefined) {
+      boardJobs = rows.map(rowToJob);
+      saveBoardJobsLocal();
+    }
+  } catch(e) {
+    console.error('loadBoardJobsFromCloud failed (using local board):', e);
+  }
+  if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
+  updateBoardCount();
+}
+
+async function saveBoardJobToCloud(job){
+  const post = (payload) => fetch(SUPABASE_URL + '/rest/v1/board_jobs', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(payload)
+  });
+  try {
+    const row = jobToRow(job);
+    let res = await post(row);
+    if (!res.ok) {
+      // e.g. older table without the attachments column — retry without it
+      const { attachments, ...noAtt } = row;
+      console.warn('saveBoardJobToCloud retry without attachments:', res.status, await res.text());
+      res = await post(noAtt);
+      if (!res.ok) console.warn('saveBoardJobToCloud failed (saved locally):', res.status, await res.text());
+    }
+  } catch(e) { console.error('saveBoardJobToCloud network error (saved locally):', e); }
+}
+async function deleteBoardJobFromCloud(id){
+  try { await sbFetch('board_jobs?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); }
+  catch(e) { console.error('deleteBoardJobFromCloud error:', e); }
+}
+function persistBoardJob(job){ saveBoardJobsLocal(); saveBoardJobToCloud(job); }
+
+function updateBoardCount(){
+  const el = document.getElementById('board-count');
+  if (el) el.textContent = boardJobs.length + ' job' + (boardJobs.length !== 1 ? 's' : '');
+}
+
+// Populate the New Job sheet dropdowns from the live property/technician lists
+function populateBoardDropdowns(){
+  const stageOpts = STAGES.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+  const njStage = document.getElementById('nj-stage');
+  if (njStage) { const c = njStage.value; njStage.innerHTML = stageOpts; njStage.value = c || 'Inquiries'; }
+  const njPark = document.getElementById('nj-park');
+  if (njPark) { const c = njPark.value;
+    njPark.innerHTML = '<option value="">Select property...</option>' +
+      properties.map(p => `<option value="${escHtml(p)}"${p===c?' selected':''}>${escHtml(p)}</option>`).join(''); }
+  const njBy = document.getElementById('nj-by');
+  if (njBy) { const c = njBy.value;
+    njBy.innerHTML = '<option value="">Select technician...</option>' +
+      technicians.map(t => `<option value="${escHtml(t)}"${t===c?' selected':''}>${escHtml(t)}</option>`).join(''); }
+}
+
+// ── Board screen ──────────────────────────────────────────
+function showBoard() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-board').classList.add('active');
+  updateBoardCount();
+  renderBoard();
+}
+function setBoardFilter(f) {
+  boardFilter = f;
+  const map = { all:0, project:1, service:2 };
+  document.querySelectorAll('#board-seg button').forEach((b, i) => b.classList.toggle('on', i === map[f]));
+  renderBoard();
+}
+
 function boardCardHtml(o) {
   const col = stageColor(o.status);
   const isProj = o.type === 'project';
   const av = avatarFor(o.by);
   const amt = parseFloat(o.total) || 0;
-  let money = '';
-  if (amt > 0) money = '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  else if (isProj) money = '$—';
-  const tagHtml = o.statusTag
-    ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
+  let money = amt > 0 ? '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 }) : (isProj ? '$—' : '');
+  const tagHtml = o.statusTag ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
   return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
       <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'PROJ':'SVC'}</span>
@@ -2201,53 +2210,132 @@ function boardCardHtml(o) {
   </div>`;
 }
 
-function boardDetailHtml(o) {
+function checklistHtml(o) {
   const checklist = Array.isArray(o.checklist) ? o.checklist : [];
-  let h = '<div class="board-detail">';
-  if (o.spaceLocation) h += `<div class="drow"><span class="k">Location</span><span class="v">${escHtml(o.spaceLocation)}</span></div>`;
-  if (o.contact) h += `<div class="drow"><span class="k">Contact</span><span class="v">${escHtml(o.contact)}</span></div>`;
-  h += `<div class="drow"><span class="k">Billing</span><span class="v">${billingPath(o.type)}</span></div>`;
-  if (o.otherNotes) h += `<div class="drow"><span class="k">Notes</span><span class="v">${escHtml(o.otherNotes)}</span></div>`;
-  h += `<div class="drow"><span class="k">Checklist</span></div><ul class="board-check">`;
-  if (checklist.length) {
-    checklist.forEach((c, i) => {
-      h += `<li class="${c.done?'done':''}" onclick="toggleChecklistItem(${o.id},${i})">
-        <span class="board-box ${c.done?'done':''}">${c.done?'✓':''}</span>
-        <span class="cklabel">${escHtml(c.label)}</span>
-        <button class="board-chk-del" onclick="event.stopPropagation();removeChecklistItem(${o.id},${i})">×</button></li>`;
-    });
-  } else {
-    h += `<li style="color:#c7c7cc;font-style:italic;cursor:default">No items yet</li>`;
-  }
-  h += `</ul>`;
-  h += `<div class="board-chk-add">
+  const items = checklist.length
+    ? checklist.map((c,i)=>`<li class="${c.done?'done':''}" onclick="toggleChecklistItem(${o.id},${i})"><span class="board-box ${c.done?'done':''}">${c.done?'✓':''}</span><span class="cklabel">${escHtml(c.label)}</span><button class="board-chk-del" onclick="event.stopPropagation();removeChecklistItem(${o.id},${i})">×</button></li>`).join('')
+    : '<li style="color:#c7c7cc;font-style:italic;cursor:default">No items yet</li>';
+  return `<ul class="board-check">${items}</ul>
+    <div class="board-chk-add">
       <input id="chk-input-${o.id}" placeholder="Add checklist item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem(${o.id})}"/>
       <button class="btn-ghost" onclick="addChecklistItem(${o.id})">Add</button>
     </div>`;
+}
+
+// ── Attachments (photos / files, stored with the job) ─────
+function attachmentsHtml(o) {
+  const atts = Array.isArray(o.attachments) ? o.attachments : [];
+  const grid = atts.map(a => (a.type && a.type.indexOf('image/') === 0)
+    ? `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
+    : `<div class="att att-file"><a href="${a.dataUrl}" download="${escHtml(a.name)}">📄 ${escHtml(a.name)}</a><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
+  ).join('');
+  return `${atts.length ? `<div class="att-grid">${grid}</div>` : '<div class="att-empty">No files yet</div>'}
+    <label class="att-add">📎 Add attachment<input type="file" accept="image/*,application/pdf" style="display:none" onchange="handleAttachmentPick(event,${o.id})"/></label>`;
+}
+
+function readAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// Downscale + compress images so they store/sync at a sensible size
+function compressImage(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) { const r = Math.min(maxDim / w, maxDim / h); w = Math.round(w * r); h = Math.round(h * r); }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function handleAttachmentPick(ev, id) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  try {
+    let dataUrl, type = file.type || 'application/octet-stream';
+    if (type.indexOf('image/') === 0) {
+      dataUrl = await compressImage(file, 1400, 0.7);
+      type = 'image/jpeg';
+    } else {
+      if (file.size > 2 * 1024 * 1024) { alert('That file is over 2 MB. Please attach a smaller file (or a photo).'); ev.target.value = ''; return; }
+      dataUrl = await readAsDataURL(file);
+    }
+    if (!Array.isArray(o.attachments)) o.attachments = [];
+    o.attachments.push({ id: Date.now(), name: file.name, type, dataUrl });
+    persistBoardJob(o);
+    refreshBoardViews();
+  } catch (e) {
+    console.error('attachment failed:', e);
+    alert('Sorry, that file could not be attached. Please try another.');
+  }
+  ev.target.value = '';
+}
+
+function deleteAttachment(jobId, attId) {
+  const o = boardJobs.find(x => x.id === jobId);
+  if (!o || !Array.isArray(o.attachments)) return;
+  if (!confirm('Delete this attachment?')) return;
+  o.attachments = o.attachments.filter(a => a.id !== attId);
+  persistBoardJob(o);
+  refreshBoardViews();
+}
+
+function openAttachment(jobId, attId) {
+  const o = boardJobs.find(x => x.id === jobId);
+  const a = o && Array.isArray(o.attachments) ? o.attachments.find(x => x.id === attId) : null;
+  if (!a) return;
+  document.getElementById('att-lightbox-img').src = a.dataUrl;
+  document.getElementById('att-lightbox').classList.add('show');
+}
+function closeLightbox() { document.getElementById('att-lightbox').classList.remove('show'); }
+
+function boardDetailHtml(o) {
+  let h = '<div class="board-detail">';
+  if (o.spaceLocation) h += `<div class="drow"><span class="k">Location</span><span class="v">${escHtml(o.spaceLocation)}</span></div>`;
+  if (o.contact) h += `<div class="drow"><span class="k">Contact</span><span class="v">${escHtml(o.contact)}</span></div>`;
+  if (o.otherNotes) h += `<div class="drow"><span class="k">Notes</span><span class="v">${escHtml(o.otherNotes)}</span></div>`;
+  const nAtt = Array.isArray(o.attachments) ? o.attachments.length : 0;
+  if (nAtt) h += `<div class="drow"><span class="k">Files</span><span class="v">📎 ${nAtt} attachment${nAtt!==1?'s':''}</span></div>`;
+  h += `<div class="drow"><span class="k">Checklist</span></div>${checklistHtml(o)}`;
   const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
-  h += `<div class="move-row"><span class="k">Stage</span>
-      <select class="move-sel" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select></div>`;
+  h += `<div class="move-row"><span class="k">Stage</span><select class="move-sel" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select></div>`;
   h += `<div class="board-actions">
-      <button class="board-open-link" onclick="showDetail(${o.id})">Open full order →</button>
+      <button class="board-open-link" onclick="showBoardJob(${o.id})">Open full view →</button>
       <button class="remove-link" onclick="removeBoardJob(${o.id})">Remove job</button>
-    </div>`;
-  h += `</div>`;
+    </div></div>`;
   return h;
 }
 
-// Card tap toggles expand, except when tapping an interactive control inside it
 function boardCardClick(ev, id) {
   if (ev.target.closest('.board-check li, .remove-link, .board-open-link, .move-sel, .board-chk-add')) return;
   toggleBoardCard(id);
+}
+function toggleBoardCard(id) {
+  expandedBoardId = expandedBoardId === id ? null : id;
+  renderBoard();
 }
 
 function renderBoard() {
   const scroller = document.getElementById('board-scroll');
   if (!scroller) return;
-  const cnt = document.getElementById('board-order-count');
-  if (cnt) cnt.textContent = orders.length;
+  updateBoardCount();
   const prevScroll = scroller.scrollLeft;
-  const visible = orders.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
+  const visible = boardJobs.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
   scroller.innerHTML = STAGES.map(stage => {
     const cards = visible.filter(o => normalizeStage(o.status) === stage.name);
     return `<div class="board-col">
@@ -2264,82 +2352,100 @@ function renderBoard() {
   scroller.scrollLeft = prevScroll;
 }
 
-function toggleBoardCard(id) {
-  expandedBoardId = expandedBoardId === id ? null : id;
-  renderBoard();
+// ── Full-screen board job detail ──────────────────────────
+function showBoardJob(id) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  currentBoardJobId = id;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-boardjob').classList.add('active');
+  const badge = document.getElementById('boardjob-status-badge');
+  badge.textContent = normalizeStage(o.status);
+  badge.className = 'status-badge';
+  badge.style.color = stageColor(o.status);
+  badge.style.background = stageColor(o.status) + '18';
+  const isProj = o.type === 'project';
+  const amt = parseFloat(o.total) || 0;
+  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
+  document.getElementById('boardjob-content').innerHTML = `
+    <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">${isProj?'Project':'Service call'}</span></div>
+    ${o.date?`<div class="detail-row"><span class="detail-label">Added</span><span class="detail-value">${fmtDate(o.date)}</span></div>`:''}
+    <div class="detail-row"><span class="detail-label">Technician</span><span class="detail-value">${escHtml(o.by||'—')}</span></div>
+    <div class="detail-row"><span class="detail-label">Park / Property</span><span class="detail-value">${escHtml(o.park||'—')}</span></div>
+    <div class="detail-row"><span class="detail-label">Space / Location</span><span class="detail-value">${escHtml(o.spaceLocation||'—')}</span></div>
+    ${o.contact?`<div class="detail-row"><span class="detail-label">Contact</span><span class="detail-value">${escHtml(o.contact)}</span></div>`:''}
+    ${amt>0?`<div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">$${amt.toLocaleString('en-US',{maximumFractionDigits:0})}</span></div>`:''}
+    ${o.description?`<div class="detail-card"><div class="detail-card-title">Description</div><div class="detail-card-text">${escHtml(o.description)}</div></div>`:''}
+    ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${escHtml(o.otherNotes)}</div></div>`:''}
+    <div class="detail-card"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
+    <div class="detail-card"><div class="detail-card-title">Checklist</div>${checklistHtml(o)}</div>
+    <div class="detail-card"><div class="detail-card-title">Stage</div>
+      <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
+    </div>
+    <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
+    <div style="height:32px"></div>
+  `;
 }
 
-// Re-render whichever board-connected view is currently on screen
+// Re-render whichever board view is on screen (board or full job detail)
 function refreshBoardViews() {
   const b = document.getElementById('screen-board');
-  const d = document.getElementById('screen-detail');
+  const d = document.getElementById('screen-boardjob');
   if (b && b.classList.contains('active')) renderBoard();
-  if (d && d.classList.contains('active') && currentOrderId != null) showDetail(currentOrderId);
-}
-
-// Persist an updated existing order (localStorage + cloud upsert)
-function persistOrder(o) {
-  try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
-  saveOrderToCloud(o);
-  updateOrderCount();
+  if (d && d.classList.contains('active') && currentBoardJobId != null) showBoardJob(currentBoardJobId);
 }
 
 function moveBoardStage(id, stage) {
-  const o = orders.find(x => x.id === id);
+  const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   o.status = stage;
-  persistOrder(o);
+  persistBoardJob(o);
   refreshBoardViews();
 }
-
 function toggleChecklistItem(id, i) {
-  const o = orders.find(x => x.id === id);
+  const o = boardJobs.find(x => x.id === id);
   if (!o || !Array.isArray(o.checklist) || !o.checklist[i]) return;
   o.checklist[i].done = !o.checklist[i].done;
-  persistOrder(o);
+  persistBoardJob(o);
   refreshBoardViews();
 }
-
 function addChecklistItem(id) {
-  const o = orders.find(x => x.id === id);
+  const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   const input = document.getElementById('chk-input-' + id);
   const label = input ? input.value.trim() : '';
   if (!label) return;
   if (!Array.isArray(o.checklist)) o.checklist = [];
   o.checklist.push({ label, done: false });
-  persistOrder(o);
+  persistBoardJob(o);
   refreshBoardViews();
 }
-
 function removeChecklistItem(id, i) {
-  const o = orders.find(x => x.id === id);
+  const o = boardJobs.find(x => x.id === id);
   if (!o || !Array.isArray(o.checklist)) return;
   o.checklist.splice(i, 1);
-  persistOrder(o);
+  persistBoardJob(o);
   refreshBoardViews();
 }
-
 function removeBoardJob(id) {
-  if (!confirm('Remove this job from the board? This deletes the work order.')) return;
-  orders = orders.filter(o => o.id !== id);
-  try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
-  deleteOrderFromCloud(id);
+  if (!confirm('Remove this job from the board?')) return;
+  boardJobs = boardJobs.filter(o => o.id !== id);
+  saveBoardJobsLocal();
+  deleteBoardJobFromCloud(id);
   expandedBoardId = null;
-  updateOrderCount();
-  renderBoard();
+  currentBoardJobId = null;
+  showBoard();
 }
 
-// ── NEW JOB (board bottom sheet) ──────────────────────────
+// ── New Job bottom sheet ──────────────────────────────────
 let njType = 'project';
 function njSetType(t) {
   njType = t;
   document.getElementById('nj-type-project').className = (t==='project' ? 'on' : '');
   document.getElementById('nj-type-service').className = (t==='service' ? 'on' : '');
 }
-
 function openNewJob() {
-  populateDropdowns(); // refresh live property + technician lists
+  populateBoardDropdowns();
   njSetType('project');
   ['nj-space','nj-desc','nj-amount','nj-tag','nj-contact'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
@@ -2347,21 +2453,15 @@ function openNewJob() {
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
   document.getElementById('nj-overlay').classList.add('show');
 }
-
-function closeNewJob() {
-  document.getElementById('nj-overlay').classList.remove('show');
-}
-
-// Add a brand-new property inline, saved to the shared property table
+function closeNewJob() { document.getElementById('nj-overlay').classList.remove('show'); }
 function njNewProperty() {
   const name = prompt('New park / property name:');
   if (!name || !name.trim()) return;
   const nm = name.trim();
   if (!properties.includes(nm)) { properties.push(nm); properties.sort(); saveProperties(); }
-  populateDropdowns();
+  populateBoardDropdowns();
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = nm;
 }
-
 function saveNewJob() {
   const by = document.getElementById('nj-by').value;
   const park = document.getElementById('nj-park').value;
@@ -2371,30 +2471,20 @@ function saveNewJob() {
   const dateStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
   const amtRaw = (document.getElementById('nj-amount').value || '').replace(/[^0-9.]/g, '');
   const stage = document.getElementById('nj-stage').value || 'Inquiries';
-  const order = {
-    id: Date.now(),
-    date: dateStr,
-    by, park,
+  const job = {
+    id: Date.now(), date: dateStr, by, park,
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
-    materials: [], testing: [], techLabor: [], techAssist: [], laborers: [],
-    fuelVehicles: '0',
-    status: stage,
-    type: njType,
-    checklist: [],
+    status: stage, type: njType, checklist: [], attachments: [],
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
-    otherNotes: '',
-    total: parseFloat(amtRaw) || 0
+    otherNotes: '', total: parseFloat(amtRaw) || 0
   };
-  orders.unshift(order);
-  try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
-  saveOrderToCloud(order);
-  updateOrderCount();
-  expandedBoardId = order.id;
+  boardJobs.unshift(job);
+  persistBoardJob(job);
+  expandedBoardId = job.id;
   closeNewJob();
   showBoard();
-  // Jump to the stage column the new job landed in
   const idx = STAGES.findIndex(s => s.name === normalizeStage(stage));
   const scroller = document.getElementById('board-scroll');
   if (scroller && scroller.children[idx]) scroller.children[idx].scrollIntoView({ behavior:'smooth', inline:'start', block:'nearest' });
@@ -2404,25 +2494,26 @@ function saveNewJob() {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.mat-desc-wrap')) closeAllAutocomplete();
 });
-// Tap the dimmed area behind the New Job sheet to close it
-(function(){
-  const ov = document.getElementById('nj-overlay');
-  if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeNewJob(); });
-})();
-// Reuse the existing header logo on the board screen
+// Reuse the existing header logo on the board screens
 (function cloneLogo(){
   const src = document.querySelector('.logo-bar img');
   if (src) document.querySelectorAll('.logo-bar[data-logo]').forEach(c => {
     if (!c.querySelector('img')) { const im = document.createElement('img'); im.src = src.src; c.appendChild(im); }
   });
 })();
+// Tap the dimmed area behind the New Job sheet to close it
+(function(){
+  const ov = document.getElementById('nj-overlay');
+  if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeNewJob(); });
+})();
 populateDropdowns();
-setJobType('service');
 renderMaterials();
 renderTestingServices();
 renderLabor();
 updateOrderCount();
+updateBoardCount();
 loadCloudData();
+loadBoardJobsFromCloud();
 </script>
 </body>
 </html>
