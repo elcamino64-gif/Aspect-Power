@@ -104,41 +104,78 @@ textarea{resize:vertical;line-height:1.6}
 .manage-mat-delete{background:none;border:none;color:#ff3b30;font-size:13px;font-weight:600;cursor:pointer;padding:6px 10px;flex-shrink:0}
 .status-btn.active-type{background:#05befe18;border-color:#05befe;color:#0a84c9}
 /* ── JOB BOARD ─────────────────────────────────────────── */
-.board-filter{display:flex;gap:8px;padding:12px 16px 4px;background:#f5f5f7}
-.board-scroll{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;gap:14px;padding:12px 16px 24px;background:#f5f5f7;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
-.board-col{flex:0 0 300px;max-width:300px;display:flex;flex-direction:column;scroll-snap-align:start}
-.board-col-head{display:flex;align-items:center;gap:8px;padding:4px 2px 12px;position:sticky;top:0}
-.board-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
-.board-col-name{font-size:14px;font-weight:600;color:#1d1d1f;flex:1;line-height:1.2}
-.board-col-count{font-size:12px;font-weight:600;color:#86868b;background:#fff;border:1px solid #d2d2d7;border-radius:20px;padding:1px 9px}
-.board-cards{display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;padding-bottom:8px}
-.board-card{background:#fff;border:1px solid #d2d2d7;border-left-width:4px;border-radius:12px;padding:13px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);cursor:pointer}
-.board-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px}
-.board-card-park{font-size:14px;font-weight:600;color:#1d1d1f;line-height:1.25}
-.board-badge{font-size:9px;font-weight:800;letter-spacing:0.04em;padding:2px 6px;border-radius:5px;flex-shrink:0}
-.board-badge-proj{background:#8257e618;color:#8257e6}
-.board-badge-svc{background:#05befe18;color:#0a84c9}
-.board-card-scope{font-size:12.5px;color:#515154;line-height:1.4;margin-bottom:8px}
-.board-card-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.board-card-tech{font-size:11px;color:#86868b}
-.board-card-amt{font-size:13px;font-weight:700;color:#05befe}
-.board-tag{display:inline-block;font-size:10px;font-weight:600;color:#86868b;background:#f2f2f7;border-radius:20px;padding:2px 9px;margin-top:8px}
-.board-empty{font-size:12px;color:#c7c7cc;text-align:center;padding:22px 8px;border:1px dashed #d2d2d7;border-radius:12px}
-.board-detail{margin-top:11px;padding-top:11px;border-top:1px solid #f2f2f7}
-.board-detail .detail-row{padding:8px 0;font-size:13px}
-.board-detail-label{font-size:10px;color:#86868b;letter-spacing:0.05em;text-transform:uppercase;font-weight:600;margin:12px 0 6px}
-.board-chk-item{display:flex;align-items:center;gap:9px;padding:6px 0}
-.board-chk-item span{font-size:13px;color:#1d1d1f;flex:1}
-.board-chk-item span.done{color:#86868b;text-decoration:line-through}
-.board-chk-del{background:none;border:none;color:#ff3b30;font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0}
+#screen-board.active{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.board-toolbar{padding:14px 16px 2px;flex-shrink:0;display:flex;align-items:center;gap:12px}
+.seg{display:flex;gap:8px;flex:1}
+.seg button{flex:1;border:1px solid #d2d2d7;background:#fff;color:#3a3a3c;font-size:13.5px;font-weight:600;padding:9px 0;border-radius:11px;cursor:pointer;font-family:inherit;transition:0.12s}
+.seg button.on{background:#05befe;border-color:#05befe;color:#fff}
+.swipe-hint{font-size:11px;color:#86868b;white-space:nowrap}
+.addbar{padding:10px 16px 2px;flex-shrink:0}
+.add-new{width:100%;border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:15px;font-weight:600;padding:12px 0;border-radius:12px;cursor:pointer;font-family:inherit}
+.add-new:active{background:#2e97f210}
+.board-scroll{flex:1;display:flex;gap:12px;overflow-x:auto;overflow-y:hidden;padding:12px 16px 24px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.board-scroll::-webkit-scrollbar{height:0}
+.board-col{flex:0 0 84%;max-width:322px;scroll-snap-align:start;display:flex;flex-direction:column;height:100%}
+.board-col-head{display:flex;align-items:center;gap:9px;padding:0 2px 9px;border-bottom:1px solid #e5e5ea;margin-bottom:11px;flex-shrink:0}
+.board-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.board-col-name{font-size:16px;font-weight:700;letter-spacing:0.2px;color:#1d1d1f}
+.board-col-count{margin-left:auto;font-size:12.5px;font-weight:600;color:#86868b;background:#fff;border:1px solid #d2d2d7;border-radius:20px;padding:1px 9px}
+.board-cards{display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;padding:2px 2px 16px}
+.board-cards::-webkit-scrollbar{width:0}
+.board-card{background:#fff;border:1px solid #d2d2d7;border-left:4px solid var(--edge,#ccc);border-radius:14px;padding:13px 14px 12px;cursor:pointer;transition:box-shadow 0.13s}
+.board-card:active{box-shadow:0 2px 10px rgba(0,0,0,0.07)}
+.board-card.open{box-shadow:0 5px 20px rgba(0,0,0,0.11)}
+.board-card-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.board-badge{font-size:9.5px;font-weight:700;letter-spacing:0.5px;padding:2px 6px;border-radius:5px;flex-shrink:0}
+.board-badge-proj{background:#e5f1fd;color:#1e7fd8}
+.board-badge-svc{background:#ececef;color:#6a6a6e}
+.board-card-park{font-size:15px;font-weight:600;line-height:1.2;color:#1d1d1f}
+.board-jobno{margin-left:auto;font-size:11px;color:#86868b;font-weight:500;white-space:nowrap}
+.board-card-scope{font-size:13px;color:#3a3a3c;line-height:1.4}
+.board-card-meta{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}
+.board-ava{width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.board-tag{font-size:10.5px;font-weight:600;letter-spacing:0.2px;padding:3px 8px;border-radius:6px}
+.board-card-amt{margin-left:auto;font-size:14px;font-weight:700;color:#1d1d1f}
+.board-empty{font-size:13px;color:#86868b;font-style:italic;padding:4px 2px}
+.board-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px solid #e5e5ea}
+.board-card.open .board-detail{display:block}
+.drow{display:flex;gap:10px;font-size:12.5px;margin-bottom:8px;line-height:1.35}
+.drow .k{color:#86868b;min-width:62px;flex-shrink:0;text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:0.4px;padding-top:1px}
+.drow .v{color:#1d1d1f;font-weight:500}
+.board-check{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.board-check li{font-size:12.5px;display:flex;align-items:center;gap:9px;color:#3a3a3c;cursor:pointer}
+.board-box{width:17px;height:17px;border:1.5px solid #c4c4ca;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;transition:0.1s}
+.board-box.done{background:#34c759;border-color:#34c759}
+.board-check li.done .cklabel{color:#86868b;text-decoration:line-through}
+.board-check li .cklabel{flex:1}
+.board-chk-del{margin-left:auto;background:none;border:none;color:#ff3b30;font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1}
 .board-chk-add{display:flex;gap:6px;margin-top:8px}
-.board-chk-add input{flex:1;padding:8px 10px;font-size:13px}
-.board-stage-select{width:100%;margin-top:6px;font-size:13px;padding:9px 12px}
-.board-detail-actions{display:flex;gap:8px;margin-top:14px}
-.board-btn-remove{flex:1;padding:10px;border-radius:10px;border:1px solid #ff3b30;background:#ff3b3010;color:#ff3b30;font-size:13px;font-weight:600;cursor:pointer}
-.board-btn-open{flex:1;padding:10px;border-radius:10px;border:1px solid #d2d2d7;background:#f5f5f7;color:#1d1d1f;font-size:13px;font-weight:600;cursor:pointer}
-.board-billing{font-size:12px;color:#1d1d1f;background:#f5f5f7;border-radius:10px;padding:10px 12px;margin-top:10px;line-height:1.4}
-.board-billing b{color:#0a84c9;font-weight:600}
+.board-chk-add input{flex:1;padding:8px 10px;font-size:12.5px}
+.move-row{display:flex;align-items:center;gap:9px;margin-top:14px}
+.move-row .k{color:#86868b;min-width:62px;text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:0.4px}
+.move-sel{flex:1;font-family:inherit;font-size:12.5px;padding:7px 9px;border:1px solid #d2d2d7;border-radius:9px;background:#fff;color:#1d1d1f}
+.board-actions{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.board-open-link{background:none;border:none;color:#2e97f2;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;padding:2px}
+.remove-link{background:none;border:none;color:#ff3b30;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;padding:2px}
+/* New-job bottom sheet */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.32);display:none;align-items:flex-end;justify-content:center;z-index:50}
+.overlay.show{display:flex}
+.sheet{background:#f5f5f7;width:100%;max-width:480px;border-radius:20px 20px 0 0;max-height:92vh;display:flex;flex-direction:column;animation:sheetup 0.22s ease}
+@keyframes sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-head{display:flex;align-items:center;padding:16px 18px 12px;border-bottom:1px solid #e5e5ea;background:#fff;border-radius:20px 20px 0 0}
+.sheet-head b{font-size:17px;font-weight:700;flex:1}
+.sheet-head button{background:none;border:none;color:#2e97f2;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit}
+.sheet-body{padding:16px 18px 8px;overflow-y:auto}
+.fl{display:block;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#86868b;margin:14px 2px 6px}
+.fl:first-child{margin-top:0}
+.prop-row{display:flex;gap:8px}
+.prop-row select{flex:1}
+.newpill{border:1px solid #d2d2d7;background:#fff;color:#1d1d1f;font-size:14px;font-weight:500;padding:0 16px;border-radius:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.typetoggle{display:flex;gap:8px}
+.typetoggle button{flex:1;border:1px solid #d2d2d7;background:#fff;color:#3a3a3c;font-size:14px;font-weight:600;padding:11px 0;border-radius:11px;cursor:pointer;font-family:inherit}
+.typetoggle button.on{background:#05befe;border-color:#05befe;color:#fff}
+.sheet-foot{padding:12px 18px calc(18px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e5e5ea}
+.save-job{width:100%;background:#05befe;border:none;color:#fff;font-size:16px;font-weight:600;padding:14px 0;border-radius:13px;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -319,56 +356,61 @@ textarea{resize:vertical;line-height:1.6}
   <div class="header">
     <div class="logo-bar" data-logo></div>
     <div class="nav-bar">
-      <button class="btn-ghost" onclick="showList()">← Orders</button>
-      <button class="btn-ghost" onclick="openNewJob()">+ New Job</button>
-    </div>
-    <div class="board-filter">
-      <button class="btn-ghost active" id="bf-all" onclick="setBoardFilter('all')">All</button>
-      <button class="btn-ghost" id="bf-project" onclick="setBoardFilter('project')">Projects</button>
-      <button class="btn-ghost" id="bf-service" onclick="setBoardFilter('service')">Service</button>
+      <div></div>
+      <button class="btn-ghost" onclick="showList()">Orders (<span id="board-order-count">0</span>)</button>
     </div>
   </div>
+  <div class="board-toolbar">
+    <div class="seg" id="board-seg">
+      <button class="on" onclick="setBoardFilter('all')">All</button>
+      <button onclick="setBoardFilter('project')">Projects</button>
+      <button onclick="setBoardFilter('service')">Service</button>
+    </div>
+    <span class="swipe-hint">swipe stages →</span>
+  </div>
+  <div class="addbar"><button class="add-new" onclick="openNewJob()">+ New Job</button></div>
   <div class="board-scroll" id="board-scroll"></div>
 </div>
 
-<!-- NEW JOB SCREEN -->
-<div id="screen-newjob" class="screen">
-  <div class="header">
-    <div class="logo-bar" data-logo></div>
-    <div class="nav-bar">
-      <button class="btn-ghost" onclick="showBoard()">← Cancel</button>
-      <span style="font-size:12px;color:#86868b">New Job</span>
-    </div>
-  </div>
-  <div class="scroll">
-    <div class="section">
-      <div class="section-title">New Job</div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div>
-          <label class="field-label">Job Type</label>
-          <div class="status-btns">
-            <button type="button" class="status-btn" id="nj-type-service" onclick="njSetType('service')">Service Call</button>
-            <button type="button" class="status-btn" id="nj-type-project" onclick="njSetType('project')">Project</button>
-          </div>
-        </div>
-        <div><label class="field-label">Stage</label><select id="nj-stage"></select></div>
-        <div>
-          <label class="field-label">Technician</label>
-          <select id="nj-by"><option value="">Select technician...</option></select>
-        </div>
-        <div>
-          <label class="field-label">Park / Property</label>
-          <select id="nj-park"><option value="">Select property...</option></select>
-        </div>
-        <div><label class="field-label">Space / Location</label><input type="text" id="nj-space" placeholder="Space # / location"/></div>
-        <div><label class="field-label">Scope / Description</label><textarea id="nj-desc" rows="3" placeholder="One-line scope of work..."></textarea></div>
-        <div><label class="field-label">Amount ($)</label><input type="number" inputmode="decimal" id="nj-amount" placeholder="0.00"/></div>
-        <div><label class="field-label">Status Tag (optional)</label><input type="text" id="nj-tag" placeholder="e.g. PG&amp;E hold, Proposal sent"/></div>
-        <div><label class="field-label">Contact (optional)</label><input type="text" id="nj-contact" placeholder="Name / phone"/></div>
+<!-- NEW JOB bottom sheet -->
+<div class="overlay" id="nj-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><b>New Job</b><button onclick="closeNewJob()">Cancel</button></div>
+    <div class="sheet-body">
+      <label class="fl">Type</label>
+      <div class="typetoggle">
+        <button type="button" id="nj-type-project" onclick="njSetType('project')">Project</button>
+        <button type="button" id="nj-type-service" onclick="njSetType('service')">Service Call</button>
       </div>
+
+      <label class="fl">Stage</label>
+      <select id="nj-stage"></select>
+
+      <label class="fl">Technician</label>
+      <select id="nj-by"><option value="">Select technician...</option></select>
+
+      <label class="fl">Park / Property</label>
+      <div class="prop-row">
+        <select id="nj-park"><option value="">Select property...</option></select>
+        <button type="button" class="newpill" onclick="njNewProperty()">+ New</button>
+      </div>
+
+      <label class="fl">Space / Location</label>
+      <input type="text" id="nj-space" placeholder="Space #, address, or panel"/>
+
+      <label class="fl">Description of Work</label>
+      <textarea id="nj-desc" rows="3" placeholder="Describe the scope..."></textarea>
+
+      <label class="fl">Amount (optional)</label>
+      <input type="text" inputmode="decimal" id="nj-amount" placeholder="$0.00"/>
+
+      <label class="fl">Status Tag (optional)</label>
+      <input type="text" id="nj-tag" placeholder="e.g. PG&amp;E hold, Proposal sent"/>
+
+      <label class="fl">Contact (optional)</label>
+      <input type="text" id="nj-contact" placeholder="Name / phone"/>
     </div>
-    <button class="btn-primary" onclick="saveNewJob()">Save Job</button>
-    <div style="height:32px"></div>
+    <div class="sheet-foot"><button class="save-job" onclick="saveNewJob()">Save Job</button></div>
   </div>
 </div>
 
@@ -2084,10 +2126,8 @@ function showBoard() {
 
 function setBoardFilter(f) {
   boardFilter = f;
-  ['all','project','service'].forEach(k => {
-    const b = document.getElementById('bf-' + k);
-    if (b) b.className = 'btn-ghost' + (k===f ? ' active' : '');
-  });
+  const map = { all:0, project:1, service:2 };
+  document.querySelectorAll('#board-seg button').forEach((b, i) => b.classList.toggle('on', i === map[f]));
   renderBoard();
 }
 
@@ -2097,58 +2137,88 @@ function billingPath(type) {
     : 'In-app — service invoice';
 }
 
+// Initials + color for a technician's avatar (matches the mockup's coloring)
+function avatarFor(name) {
+  const n = (name || '').trim();
+  const parts = n.split(/\s+/).filter(Boolean);
+  let initials = '?';
+  if (parts.length >= 2) initials = (parts[0][0] + parts[1][0]).toUpperCase();
+  else if (parts.length === 1) initials = parts[0].slice(0, 2).toUpperCase();
+  const colors = { patrick:'#1D1D1F', troy:'#12B5AE', jose:'#8257E6', monique:'#C77A12' };
+  const color = colors[(parts[0] || '').toLowerCase()] || '#2E97F2';
+  return { initials, color };
+}
+
 function boardCardHtml(o) {
   const col = stageColor(o.status);
   const isProj = o.type === 'project';
+  const av = avatarFor(o.by);
   const amt = parseFloat(o.total) || 0;
-  return `<div class="board-card" style="border-left-color:${col}" onclick="toggleBoardCard(${o.id})">
+  let money = '';
+  if (amt > 0) money = '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  else if (isProj) money = '$—';
+  const tagHtml = o.statusTag
+    ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
+  return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
-      <span class="board-card-park">${escHtml(o.park || '—')}</span>
       <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'PROJ':'SVC'}</span>
+      <span class="board-card-park">${escHtml(o.park || '—')}</span>
     </div>
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
     <div class="board-card-meta">
-      <span class="board-card-tech">${escHtml(o.by || 'Unassigned')}</span>
-      ${amt>0?`<span class="board-card-amt">$${amt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`:''}
+      <span class="board-ava" style="background:${av.color}">${av.initials}</span>
+      ${tagHtml}
+      ${money?`<span class="board-card-amt">${money}</span>`:''}
     </div>
-    ${o.statusTag?`<div><span class="board-tag">${escHtml(o.statusTag)}</span></div>`:''}
-    ${expandedBoardId===o.id ? boardDetailHtml(o) : ''}
+    ${boardDetailHtml(o)}
   </div>`;
 }
 
 function boardDetailHtml(o) {
   const checklist = Array.isArray(o.checklist) ? o.checklist : [];
-  const chkRows = checklist.map((c, i) => `
-    <div class="board-chk-item">
-      <div class="checkbox${c.done?' checked':''}" onclick="event.stopPropagation();toggleChecklistItem(${o.id},${i})"></div>
-      <span class="${c.done?'done':''}">${escHtml(c.label)}</span>
-      <button class="board-chk-del" onclick="event.stopPropagation();removeChecklistItem(${o.id},${i})">×</button>
-    </div>`).join('');
-  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
-  return `<div class="board-detail" onclick="event.stopPropagation()">
-    <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escHtml(o.spaceLocation || '—')}</span></div>
-    <div class="detail-row"><span class="detail-label">Contact</span><span class="detail-value">${escHtml(o.contact || '—')}</span></div>
-    <div class="detail-row"><span class="detail-label">Technician</span><span class="detail-value">${escHtml(o.by || '—')}</span></div>
-    <div class="board-billing">Billing: <b>${billingPath(o.type)}</b></div>
-    ${o.otherNotes?`<div class="board-detail-label">Notes</div><div style="font-size:13px;color:#1d1d1f;line-height:1.5">${escHtml(o.otherNotes)}</div>`:''}
-    <div class="board-detail-label">Checklist</div>
-    ${chkRows || '<div style="font-size:12px;color:#c7c7cc;padding:2px 0">No items yet.</div>'}
-    <div class="board-chk-add">
+  let h = '<div class="board-detail">';
+  if (o.spaceLocation) h += `<div class="drow"><span class="k">Location</span><span class="v">${escHtml(o.spaceLocation)}</span></div>`;
+  if (o.contact) h += `<div class="drow"><span class="k">Contact</span><span class="v">${escHtml(o.contact)}</span></div>`;
+  h += `<div class="drow"><span class="k">Billing</span><span class="v">${billingPath(o.type)}</span></div>`;
+  if (o.otherNotes) h += `<div class="drow"><span class="k">Notes</span><span class="v">${escHtml(o.otherNotes)}</span></div>`;
+  h += `<div class="drow"><span class="k">Checklist</span></div><ul class="board-check">`;
+  if (checklist.length) {
+    checklist.forEach((c, i) => {
+      h += `<li class="${c.done?'done':''}" onclick="toggleChecklistItem(${o.id},${i})">
+        <span class="board-box ${c.done?'done':''}">${c.done?'✓':''}</span>
+        <span class="cklabel">${escHtml(c.label)}</span>
+        <button class="board-chk-del" onclick="event.stopPropagation();removeChecklistItem(${o.id},${i})">×</button></li>`;
+    });
+  } else {
+    h += `<li style="color:#c7c7cc;font-style:italic;cursor:default">No items yet</li>`;
+  }
+  h += `</ul>`;
+  h += `<div class="board-chk-add">
       <input id="chk-input-${o.id}" placeholder="Add checklist item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem(${o.id})}"/>
       <button class="btn-ghost" onclick="addChecklistItem(${o.id})">Add</button>
-    </div>
-    <div class="board-detail-label">Move to stage</div>
-    <select class="board-stage-select" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
-    <div class="board-detail-actions">
-      <button class="board-btn-open" onclick="showDetail(${o.id})">Open full order</button>
-      <button class="board-btn-remove" onclick="removeBoardJob(${o.id})">Remove job</button>
-    </div>
-  </div>`;
+    </div>`;
+  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
+  h += `<div class="move-row"><span class="k">Stage</span>
+      <select class="move-sel" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select></div>`;
+  h += `<div class="board-actions">
+      <button class="board-open-link" onclick="showDetail(${o.id})">Open full order →</button>
+      <button class="remove-link" onclick="removeBoardJob(${o.id})">Remove job</button>
+    </div>`;
+  h += `</div>`;
+  return h;
+}
+
+// Card tap toggles expand, except when tapping an interactive control inside it
+function boardCardClick(ev, id) {
+  if (ev.target.closest('.board-check li, .remove-link, .board-open-link, .move-sel, .board-chk-add')) return;
+  toggleBoardCard(id);
 }
 
 function renderBoard() {
   const scroller = document.getElementById('board-scroll');
   if (!scroller) return;
+  const cnt = document.getElementById('board-order-count');
+  if (cnt) cnt.textContent = orders.length;
   const prevScroll = scroller.scrollLeft;
   const visible = orders.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
   scroller.innerHTML = STAGES.map(stage => {
@@ -2160,7 +2230,7 @@ function renderBoard() {
         <span class="board-col-count">${cards.length}</span>
       </div>
       <div class="board-cards">
-        ${cards.length ? cards.map(boardCardHtml).join('') : '<div class="board-empty">No jobs</div>'}
+        ${cards.length ? cards.map(boardCardHtml).join('') : '<div class="board-empty">Nothing here.</div>'}
       </div>
     </div>`;
   }).join('');
@@ -2225,23 +2295,36 @@ function removeBoardJob(id) {
   renderBoard();
 }
 
-// ── NEW JOB (board) ───────────────────────────────────────
-let njType = 'service';
+// ── NEW JOB (board bottom sheet) ──────────────────────────
+let njType = 'project';
 function njSetType(t) {
   njType = t;
-  document.getElementById('nj-type-service').className = 'status-btn' + (t==='service'?' active-type':'');
-  document.getElementById('nj-type-project').className = 'status-btn' + (t==='project'?' active-type':'');
+  document.getElementById('nj-type-project').className = (t==='project' ? 'on' : '');
+  document.getElementById('nj-type-service').className = (t==='service' ? 'on' : '');
 }
 
 function openNewJob() {
   populateDropdowns(); // refresh live property + technician lists
-  njSetType('service');
+  njSetType('project');
   ['nj-space','nj-desc','nj-amount','nj-tag','nj-contact'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : '';
+  const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-newjob').classList.add('active');
+  document.getElementById('nj-overlay').classList.add('show');
+}
+
+function closeNewJob() {
+  document.getElementById('nj-overlay').classList.remove('show');
+}
+
+// Add a brand-new property inline, saved to the shared property table
+function njNewProperty() {
+  const name = prompt('New park / property name:');
+  if (!name || !name.trim()) return;
+  const nm = name.trim();
+  if (!properties.includes(nm)) { properties.push(nm); properties.sort(); saveProperties(); }
+  populateDropdowns();
+  const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = nm;
 }
 
 function saveNewJob() {
@@ -2251,6 +2334,8 @@ function saveNewJob() {
   if (!by) { alert('Please choose a Technician.'); return; }
   const today = new Date();
   const dateStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  const amtRaw = (document.getElementById('nj-amount').value || '').replace(/[^0-9.]/g, '');
+  const stage = document.getElementById('nj-stage').value || 'Inquiries';
   const order = {
     id: Date.now(),
     date: dateStr,
@@ -2259,29 +2344,37 @@ function saveNewJob() {
     description: document.getElementById('nj-desc').value,
     materials: [], testing: [], techLabor: [], techAssist: [], laborers: [],
     fuelVehicles: '0',
-    status: document.getElementById('nj-stage').value || 'Inquiries',
+    status: stage,
     type: njType,
     checklist: [],
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
     otherNotes: '',
-    total: parseFloat(document.getElementById('nj-amount').value) || 0
+    total: parseFloat(amtRaw) || 0
   };
-  // Keep the property list in sync if a brand-new property was typed elsewhere
-  if (park && !properties.includes(park)) { properties.push(park); properties.sort(); saveProperties(); }
   orders.unshift(order);
   try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
   saveOrderToCloud(order);
   updateOrderCount();
   expandedBoardId = order.id;
+  closeNewJob();
   showBoard();
+  // Jump to the stage column the new job landed in
+  const idx = STAGES.findIndex(s => s.name === normalizeStage(stage));
+  const scroller = document.getElementById('board-scroll');
+  if (scroller && scroller.children[idx]) scroller.children[idx].scrollIntoView({ behavior:'smooth', inline:'start', block:'nearest' });
 }
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.mat-desc-wrap')) closeAllAutocomplete();
 });
-// Reuse the existing header logo on the new board / new-job screens
+// Tap the dimmed area behind the New Job sheet to close it
+(function(){
+  const ov = document.getElementById('nj-overlay');
+  if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeNewJob(); });
+})();
+// Reuse the existing header logo on the board screen
 (function cloneLogo(){
   const src = document.querySelector('.logo-bar img');
   if (src) document.querySelectorAll('.logo-bar[data-logo]').forEach(c => {
