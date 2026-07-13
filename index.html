@@ -470,6 +470,18 @@ textarea{resize:vertical;line-height:1.6}
   <img id="att-lightbox-img" src="" alt="attachment"/>
 </div>
 
+<!-- Permit Required? Yes/No dialog -->
+<div class="modal-overlay" id="permit-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">Permit Required?</div>
+    <div style="font-size:13.5px;color:#86868b;line-height:1.5;margin-bottom:6px">Does this job need a permit before it can be scheduled?</div>
+    <div class="modal-btns">
+      <button class="modal-btn-cancel" onclick="answerPermit(false)">No</button>
+      <button class="modal-btn-confirm" onclick="answerPermit(true)">Yes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── SUPABASE CONFIG ───────────────────────────────────────
 const SUPABASE_URL = 'https://rvrilypibjcmcmyzoynx.supabase.co';
@@ -2554,10 +2566,26 @@ function refreshBoardViews() {
   if (d && d.classList.contains('active') && currentBoardJobId != null) showBoardJob(currentBoardJobId);
 }
 
+let permitJobId = null;
 function moveBoardStage(id, stage) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
+  // Moving Approved → Ready to Schedule: ask whether a permit is required first
+  if (normalizeStage(o.status) === 'Approved' && stage === 'Ready to Schedule') {
+    permitJobId = id;
+    document.getElementById('permit-overlay').style.display = 'flex';
+    return; // answerPermit() sets the final stage
+  }
   o.status = stage;
+  persistBoardJob(o);
+  refreshBoardViews();
+}
+function answerPermit(yes) {
+  const id = permitJobId; permitJobId = null;
+  document.getElementById('permit-overlay').style.display = 'none';
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  o.status = yes ? 'Permit Pending' : 'Ready to Schedule';
   persistBoardJob(o);
   refreshBoardViews();
 }
