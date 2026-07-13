@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: board-first-workorders -->
+<!-- build: svc-autocreate-wo -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2704,6 +2704,27 @@ function njNewProperty() {
   populateBoardDropdowns();
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = nm;
 }
+// Create one invoice-ready work order from a board Service Call
+function createWorkOrderFromJob(job) {
+  const wo = {
+    id: (job.id || Date.now()) + 1,
+    date: job.date,
+    by: job.by,
+    park: job.park,
+    spaceLocation: job.spaceLocation || '',
+    description: job.description || '',
+    materials: [], testing: [], techLabor: [], techAssist: [], laborers: [],
+    fuelVehicles: '0',
+    status: '',
+    otherNotes: job.otherNotes || '',
+    total: 0
+  };
+  orders.unshift(wo);
+  try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
+  Promise.resolve(saveOrderToCloud(wo)).catch(e => console.error('work order cloud save failed (saved locally):', e));
+  updateOrderCount();
+}
+
 function saveNewJob() {
   const by = document.getElementById('nj-by').value;
   const park = document.getElementById('nj-park').value;
@@ -2725,6 +2746,8 @@ function saveNewJob() {
   };
   boardJobs.unshift(job);
   persistBoardJob(job);
+  // A Service Call automatically gets one invoice-ready work order
+  if (job.type === 'service') createWorkOrderFromJob(job);
   njAttachments = [];
   expandedBoardId = job.id;
   closeNewJob();
