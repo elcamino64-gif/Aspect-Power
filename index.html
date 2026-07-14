@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: address-csz-save -->
+<!-- build: checklist-add-fix -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2439,8 +2439,8 @@ function checklistHtml(o) {
     : '<li style="color:#c7c7cc;font-style:italic;cursor:default">No items yet</li>';
   return `<ul class="board-check">${items}</ul>
     <div class="board-chk-add">
-      <input id="chk-input-${o.id}" placeholder="Add checklist item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem(${o.id})}"/>
-      <button class="btn-ghost" onclick="addChecklistItem(${o.id})">Add</button>
+      <input id="chk-input-${o.id}" placeholder="Add checklist item..." onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem(${o.id}, this)}"/>
+      <button class="btn-ghost" onclick="addChecklistItem(${o.id}, this)">Add</button>
     </div>`;
 }
 
@@ -2768,14 +2768,23 @@ function toggleChecklistItem(id, i) {
   persistBoardJob(o);
   refreshBoardViews();
 }
-function addChecklistItem(id) {
+function addChecklistItem(id, el) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  const input = document.getElementById('chk-input-' + id);
+  // The same job renders a checklist input on both the board card and the full
+  // detail view, so they share an id — read the input next to the control the
+  // user actually used, not the first matching id in the document.
+  let input = null;
+  if (el && el.closest) {
+    const wrap = el.closest('.board-chk-add');
+    input = wrap ? wrap.querySelector('input') : null;
+  }
+  if (!input) input = document.getElementById('chk-input-' + id);
   const label = input ? input.value.trim() : '';
   if (!label) return;
   if (!Array.isArray(o.checklist)) o.checklist = [];
   o.checklist.push({ label, done: false });
+  if (input) input.value = '';
   persistBoardJob(o);
   refreshBoardViews();
 }
