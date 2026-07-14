@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: nav-trio-taplinks -->
+<!-- build: contacts-dropdown -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2411,7 +2411,7 @@ function boardCardHtml(o) {
       <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'Project':'Service'}</span>
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
     </div>
-    ${o.spaceLocation?`<div class="board-card-space">Space ${escHtml(o.spaceLocation)}</div>`:''}
+    ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
     <div class="board-card-meta">
       <span class="board-ava" style="background:${av.color}">${av.initials}</span>
@@ -2900,6 +2900,7 @@ function upsertPropertyContact(name, contact){
 
 // ── Contacts / property directory screen ──────────────────
 let contactNames = [];
+let contactsSelected = null;
 function showContacts() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-contacts').classList.add('active');
@@ -2909,45 +2910,57 @@ function renderContacts() {
   const el = document.getElementById('contacts-content');
   contactNames = Array.from(new Set([...properties, ...Object.keys(propertyInfo)])).sort((a,b) => a.localeCompare(b));
   if (!contactNames.length) { el.innerHTML = '<div class="empty">No properties yet. Add one from a new job.</div>'; return; }
-  el.innerHTML = contactNames.map((n, pi) => {
-    const info = propertyInfo[n] || { address:'', contacts:[] };
-    const contacts = Array.isArray(info.contacts) ? info.contacts : [];
-    const contactBlocks = contacts.map((c, ci) => `
-      <div class="contact-block">
-        <div class="contact-block-head">
-          <span class="contact-block-label">Contact ${ci+1}</span>
-          <button class="board-chk-del" onclick="removeContact(${pi},${ci})">×</button>
-        </div>
-        <label class="fl">Name</label>
-        <input type="text" value="${escHtml(c.name||'')}" placeholder="Name" onchange="editContact(${pi},${ci},'name',this.value)"/>
-        <label class="fl">Title</label>
-        <input type="text" list="title-options" value="${escHtml(c.title||'')}" placeholder="e.g. Manager" onchange="editContact(${pi},${ci},'title',this.value)"/>
-        <label class="fl">Phone</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="cph-${pi}-${ci}" type="tel" inputmode="tel" value="${escHtml(c.phone||'')}" placeholder="Phone" onchange="editContact(${pi},${ci},'phone',this.value)" style="flex:1"/>
-          <a class="contact-link" onclick="dialField('cph-${pi}-${ci}')">📞 Call</a>
-        </div>
-        <label class="fl">Email</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="cem-${pi}-${ci}" type="email" inputmode="email" value="${escHtml(c.email||'')}" placeholder="Email" onchange="editContact(${pi},${ci},'email',this.value)" style="flex:1"/>
-          <a class="contact-link" onclick="emailField('cem-${pi}-${ci}')">✉️ Email</a>
-        </div>
-      </div>`).join('');
-    return `<div class="detail-card">
-      <div class="detail-card-title">${escHtml(n)}</div>
-      <label class="fl">Address</label>
-      <input type="text" value="${escHtml(info.address||'')}" placeholder="Street, city" onchange="editPropAddress(${pi},this.value)"/>
-      ${contactBlocks || '<div class="att-empty" style="margin-top:10px">No contacts yet</div>'}
-      <button class="att-add" style="margin-top:10px" onclick="addContact(${pi})">＋ Add contact</button>
-    </div>`;
-  }).join('') + '<div style="height:32px"></div>';
+  if (!contactsSelected || !contactNames.includes(contactsSelected)) contactsSelected = contactNames[0];
+  const opts = contactNames.map(n => `<option value="${escHtml(n)}"${n===contactsSelected?' selected':''}>${escHtml(n)}</option>`).join('');
+  el.innerHTML = `
+    <label class="fl" style="margin-top:0">Property</label>
+    <select id="contacts-prop-select" onchange="selectContactProperty(this.value)">${opts}</select>
+    <div id="contacts-detail"></div>
+    <div style="height:32px"></div>`;
+  renderContactsDetail();
+}
+function selectContactProperty(name){ contactsSelected = name; renderContactsDetail(); }
+function renderContactsDetail() {
+  const el = document.getElementById('contacts-detail');
+  if (!el) return;
+  const n = contactsSelected;
+  const pi = contactNames.indexOf(n);
+  const info = propertyInfo[n] || { address:'', contacts:[] };
+  const contacts = Array.isArray(info.contacts) ? info.contacts : [];
+  const contactBlocks = contacts.map((c, ci) => `
+    <div class="contact-block">
+      <div class="contact-block-head">
+        <span class="contact-block-label">Contact ${ci+1}</span>
+        <button class="board-chk-del" onclick="removeContact(${pi},${ci})">×</button>
+      </div>
+      <label class="fl">Name</label>
+      <input type="text" value="${escHtml(c.name||'')}" placeholder="Name" onchange="editContact(${pi},${ci},'name',this.value)"/>
+      <label class="fl">Title</label>
+      <input type="text" list="title-options" value="${escHtml(c.title||'')}" placeholder="e.g. Manager" onchange="editContact(${pi},${ci},'title',this.value)"/>
+      <label class="fl">Phone</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="cph-${pi}-${ci}" type="tel" inputmode="tel" value="${escHtml(c.phone||'')}" placeholder="Phone" onchange="editContact(${pi},${ci},'phone',this.value)" style="flex:1"/>
+        <a class="contact-link" onclick="dialField('cph-${pi}-${ci}')">📞 Call</a>
+      </div>
+      <label class="fl">Email</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="cem-${pi}-${ci}" type="email" inputmode="email" value="${escHtml(c.email||'')}" placeholder="Email" onchange="editContact(${pi},${ci},'email',this.value)" style="flex:1"/>
+        <a class="contact-link" onclick="emailField('cem-${pi}-${ci}')">✉️ Email</a>
+      </div>
+    </div>`).join('');
+  el.innerHTML = `<div class="detail-card" style="margin-top:14px">
+    <label class="fl" style="margin-top:0">Address</label>
+    <input type="text" value="${escHtml(info.address||'')}" placeholder="Street, city" onchange="editPropAddress(${pi},this.value)"/>
+    ${contactBlocks || '<div class="att-empty" style="margin-top:10px">No contacts yet</div>'}
+    <button class="att-add" style="margin-top:10px" onclick="addContact(${pi})">＋ Add contact</button>
+  </div>`;
 }
 function dialField(id){ const el = document.getElementById(id); const v = el ? el.value.trim() : ''; if (v) location.href = 'tel:' + v.replace(/[^0-9+]/g, ''); }
 function emailField(id){ const el = document.getElementById(id); const v = el ? el.value.trim() : ''; if (v) location.href = 'mailto:' + v; }
 function editPropAddress(pi, value){ const n = contactNames[pi]; if (n) setPropertyAddress(n, value); }
 function editContact(pi, ci, field, value){ const n = contactNames[pi]; if (n) setContactField(n, ci, field, value); }
-function addContact(pi){ const n = contactNames[pi]; if (n) { addPropertyContact(n, { name:'', title:'', phone:'', email:'' }); renderContacts(); } }
-function removeContact(pi, ci){ const n = contactNames[pi]; if (n && confirm('Remove this contact?')) { removePropertyContact(n, ci); renderContacts(); } }
+function addContact(pi){ const n = contactNames[pi]; if (n) { addPropertyContact(n, { name:'', title:'', phone:'', email:'' }); renderContactsDetail(); } }
+function removeContact(pi, ci){ const n = contactNames[pi]; if (n && confirm('Remove this contact?')) { removePropertyContact(n, ci); renderContactsDetail(); } }
 // Create one invoice-ready work order from a board Service Call
 function createWorkOrderFromJob(job) {
   const wo = {
