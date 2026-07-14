@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: email-wrap-fix -->
+<!-- build: address-csz-save -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2177,12 +2177,12 @@ function savePropertyInfoLocal(){ try { localStorage.setItem('propertyInfo', JSO
 function normalizePropertyInfo(){
   Object.keys(propertyInfo).forEach(name => {
     const v = propertyInfo[name] || {};
-    if (Array.isArray(v.contacts)) { propertyInfo[name] = { address: v.address || '', contacts: v.contacts }; return; }
+    const addr = { address: v.address || '', city: v.city || '', state: v.state || '', zip: v.zip || '' };
+    if (Array.isArray(v.contacts)) { propertyInfo[name] = { ...addr, contacts: v.contacts }; return; }
     const list = [];
     if (v.contactName || v.contactPhone || v.contactEmail)
       list.push({ name: v.contactName || '', title: '', phone: v.contactPhone || '', email: v.contactEmail || '' });
-    propertyInfo[name] = { address: v.address || '', contacts: list };
-    // collect any titles present
+    propertyInfo[name] = { ...addr, contacts: list };
   });
   Object.values(propertyInfo).forEach(v => v.contacts.forEach(c => { if (c.title) addTitleOption(c.title); }));
 }
@@ -2202,7 +2202,7 @@ async function loadPropertyInfoFromCloud(){
         let contacts = Array.isArray(r.contacts) ? r.contacts : [];
         if (!contacts.length && (r.contact_name || r.contact_phone || r.contact_email))
           contacts = [{ name: r.contact_name || '', title: '', phone: r.contact_phone || '', email: r.contact_email || '' }];
-        m[r.name] = { address: r.address || '', contacts };
+        m[r.name] = { address: r.address || '', city: r.city || '', state: r.state || '', zip: r.zip || '', contacts };
       });
       propertyInfo = m;
       savePropertyInfoLocal();
@@ -2212,8 +2212,9 @@ async function loadPropertyInfoFromCloud(){
 async function savePropertyInfoToCloud(name){
   const info = propInfo(name);
   const first = info.contacts[0] || {};
-  const full = { name, address: info.address || '', contacts: info.contacts,
-    contact_name: first.name || '', contact_phone: first.phone || '', contact_email: first.email || '' };
+  const full = { name, address: info.address || '', city: info.city || '', state: info.state || '', zip: info.zip || '',
+    contacts: info.contacts, contact_name: first.name || '', contact_phone: first.phone || '', contact_email: first.email || '' };
+  const base = { name, address: info.address || '', contact_name: first.name || '', contact_phone: first.phone || '', contact_email: first.email || '' };
   const post = (payload) => fetch(SUPABASE_URL + '/rest/v1/property_directory', {
     method: 'POST',
     headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
@@ -2222,11 +2223,20 @@ async function savePropertyInfoToCloud(name){
   });
   try {
     let res = await post(full);
-    if (!res.ok) { const { contacts, ...noContacts } = full; res = await post(noContacts); } // older table w/o contacts column
+    if (!res.ok) res = await post(base); // older table w/o contacts/city/state/zip columns
   } catch(e) { console.error('savePropertyInfoToCloud failed (saved locally):', e); }
 }
 function persistProperty(name){ savePropertyInfoLocal(); savePropertyInfoToCloud(name); }
-function setPropertyAddress(name, address){ propInfo(name).address = address; persistProperty(name); }
+function formatAddress(info){
+  if (!info) return '';
+  const parts = [];
+  if (info.address) parts.push(info.address);
+  const csz = [info.city, info.state].filter(Boolean).join(', ') + (info.zip ? ' ' + info.zip : '');
+  if (csz.trim()) parts.push(csz.trim());
+  return parts.join(', ');
+}
+function setPropertyField(name, field, value){ propInfo(name)[field] = value; persistProperty(name); }
+function setPropertyAddress(name, address){ setPropertyField(name, 'address', address); }
 function setContactField(name, idx, field, value){
   const c = propInfo(name).contacts[idx]; if (!c) return;
   c[field] = value;
@@ -2877,7 +2887,8 @@ function njPropChange() {
   if (contacts.length) { sel.value = '0'; njFillContact(contacts[0]); }
   else { sel.value = 'new'; njFillContact(null); }
   const hint = document.getElementById('nj-address-hint');
-  if (hint) hint.textContent = (info && info.address) ? ('📍 ' + info.address) : '';
+  const addr = formatAddress(info);
+  if (hint) hint.textContent = addr ? ('📍 ' + addr) : '';
 }
 function njFillContact(c){
   document.getElementById('nj-contact').value = c ? (c.name || '') : '';
@@ -2951,11 +2962,34 @@ function renderContactsDetail() {
     </div>`).join('');
   el.innerHTML = `<div class="detail-card" style="margin-top:14px">
     <label class="fl" style="margin-top:0">Address</label>
-    <input type="text" value="${escHtml(info.address||'')}" placeholder="Street, city" onchange="editPropAddress(${pi},this.value)"/>
+    <input id="cd-address" type="text" value="${escHtml(info.address||'')}" placeholder="Street address" onchange="editPropField(${pi},'address',this.value)"/>
+    <label class="fl">City</label>
+    <input id="cd-city" type="text" value="${escHtml(info.city||'')}" placeholder="City" onchange="editPropField(${pi},'city',this.value)"/>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1">
+        <label class="fl">State</label>
+        <input id="cd-state" type="text" value="${escHtml(info.state||'')}" placeholder="State" onchange="editPropField(${pi},'state',this.value)"/>
+      </div>
+      <div style="flex:1">
+        <label class="fl">Zip</label>
+        <input id="cd-zip" type="text" inputmode="numeric" value="${escHtml(info.zip||'')}" placeholder="Zip" onchange="editPropField(${pi},'zip',this.value)"/>
+      </div>
+    </div>
     ${contactBlocks || '<div class="att-empty" style="margin-top:10px">No contacts yet</div>'}
     <button class="att-add" style="margin-top:10px" onclick="addContact(${pi})">＋ Add contact</button>
+    <button class="btn-primary" id="cd-save" style="margin-top:16px" onclick="saveContactsProperty()">Save</button>
   </div>`;
 }
+function saveContactsProperty(){
+  const n = contactsSelected; if (!n) return;
+  const info = propInfo(n);
+  const g = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  ['address','city','state','zip'].forEach(f => { const v = g('cd-' + f); if (v !== undefined) info[f] = v; });
+  persistProperty(n);
+  const btn = document.getElementById('cd-save');
+  if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => { const b = document.getElementById('cd-save'); if (b) b.textContent = 'Save'; }, 1300); }
+}
+function editPropField(pi, field, value){ const n = contactNames[pi]; if (n) setPropertyField(n, field, value); }
 function dialField(id){ const el = document.getElementById(id); const v = el ? el.value.trim() : ''; if (v) location.href = 'tel:' + v.replace(/[^0-9+]/g, ''); }
 function emailField(id){ const el = document.getElementById(id); const v = el ? el.value.trim() : ''; if (v) location.href = 'mailto:' + v; }
 function editPropAddress(pi, value){ const n = contactNames[pi]; if (n) setPropertyAddress(n, value); }
