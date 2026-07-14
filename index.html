@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: property-contacts -->
+<!-- build: multi-contacts-titles -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -200,6 +200,9 @@ textarea{resize:vertical;line-height:1.6}
 .att-file-icon{font-size:26px;line-height:1}
 .att-file-name{font-size:9px;color:#3a3a3c;text-align:center;line-height:1.15;max-height:22px;overflow:hidden;width:100%;word-break:break-word}
 .bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
+.contact-block{border:1px solid #e5e5ea;border-radius:12px;padding:10px 12px 12px;margin-top:12px;background:#fafafa}
+.contact-block-head{display:flex;align-items:center;justify-content:space-between}
+.contact-block-label{font-size:11px;font-weight:700;letter-spacing:0.3px;color:#86868b}
 .att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
 .att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
@@ -465,8 +468,14 @@ textarea{resize:vertical;line-height:1.6}
       <label class="fl">Status Tag (optional)</label>
       <input type="text" id="nj-tag" placeholder="e.g. PG&amp;E hold, Proposal sent"/>
 
+      <label class="fl">Contact</label>
+      <select id="nj-contact-select" onchange="njPickContact()"><option value="new">+ New contact</option></select>
+
       <label class="fl">Contact Name (optional)</label>
       <input type="text" id="nj-contact" placeholder="Name"/>
+
+      <label class="fl">Title (optional)</label>
+      <input type="text" id="nj-contact-title" list="title-options" placeholder="e.g. Manager"/>
 
       <label class="fl">Contact Phone (optional)</label>
       <input type="tel" id="nj-contact-phone" inputmode="tel" placeholder="Phone number"/>
@@ -480,6 +489,9 @@ textarea{resize:vertical;line-height:1.6}
     <div class="sheet-foot"><button class="save-job" onclick="saveNewJob()">Save Job</button></div>
   </div>
 </div>
+
+<!-- Shared list of contact title suggestions (Manager, etc.) -->
+<datalist id="title-options"></datalist>
 
 <!-- Image attachment lightbox -->
 <div class="lightbox" id="att-lightbox" onclick="closeLightbox()">
@@ -2133,66 +2145,119 @@ let boardZoom = 1;
 try { boardZoom = parseFloat(localStorage.getItem('boardZoom')) || 1; } catch(e){}
 let njAttachments = [];
 
-// ── PROPERTY DIRECTORY (contact + address per property) ───
+// ── PROPERTY DIRECTORY (address + a list of contacts per property) ───
+// Shape: propertyInfo[name] = { address, contacts: [ {name, title, phone, email} ] }
 let propertyInfo = {};
 try { propertyInfo = JSON.parse(localStorage.getItem('propertyInfo') || '{}'); } catch(e){}
+let contactTitles = ['Manager'];
+try {
+  const saved = JSON.parse(localStorage.getItem('contactTitles') || 'null');
+  if (Array.isArray(saved) && saved.length) contactTitles = Array.from(new Set(['Manager', ...saved]));
+} catch(e){}
+function saveContactTitlesLocal(){ try { localStorage.setItem('contactTitles', JSON.stringify(contactTitles)); } catch(e){} }
+function addTitleOption(t){
+  t = (t || '').trim();
+  if (t && !contactTitles.includes(t)) { contactTitles.push(t); saveContactTitlesLocal(); rebuildTitleDatalist(); }
+}
+function rebuildTitleDatalist(){
+  const dl = document.getElementById('title-options');
+  if (dl) dl.innerHTML = contactTitles.map(t => `<option value="${escHtml(t)}"></option>`).join('');
+}
+
 function savePropertyInfoLocal(){ try { localStorage.setItem('propertyInfo', JSON.stringify(propertyInfo)); } catch(e){} }
+
+// Convert any old single-contact entries to the new {address, contacts[]} shape
+function normalizePropertyInfo(){
+  Object.keys(propertyInfo).forEach(name => {
+    const v = propertyInfo[name] || {};
+    if (Array.isArray(v.contacts)) { propertyInfo[name] = { address: v.address || '', contacts: v.contacts }; return; }
+    const list = [];
+    if (v.contactName || v.contactPhone || v.contactEmail)
+      list.push({ name: v.contactName || '', title: '', phone: v.contactPhone || '', email: v.contactEmail || '' });
+    propertyInfo[name] = { address: v.address || '', contacts: list };
+    // collect any titles present
+  });
+  Object.values(propertyInfo).forEach(v => v.contacts.forEach(c => { if (c.title) addTitleOption(c.title); }));
+}
+function propInfo(name){
+  if (!propertyInfo[name]) propertyInfo[name] = { address: '', contacts: [] };
+  if (!Array.isArray(propertyInfo[name].contacts)) propertyInfo[name].contacts = [];
+  return propertyInfo[name];
+}
+function getContacts(name){ return (propertyInfo[name] && Array.isArray(propertyInfo[name].contacts)) ? propertyInfo[name].contacts : []; }
 
 async function loadPropertyInfoFromCloud(){
   try {
     const rows = await sbFetch('property_directory');
     if (rows && rows.length !== undefined) {
       const m = {};
-      rows.forEach(r => { m[r.name] = {
-        contactName: r.contact_name || '', contactPhone: r.contact_phone || '',
-        contactEmail: r.contact_email || '', address: r.address || '' }; });
+      rows.forEach(r => {
+        let contacts = Array.isArray(r.contacts) ? r.contacts : [];
+        if (!contacts.length && (r.contact_name || r.contact_phone || r.contact_email))
+          contacts = [{ name: r.contact_name || '', title: '', phone: r.contact_phone || '', email: r.contact_email || '' }];
+        m[r.name] = { address: r.address || '', contacts };
+      });
       propertyInfo = m;
       savePropertyInfoLocal();
     }
   } catch(e) { console.error('loadPropertyInfoFromCloud failed (using local):', e); }
 }
 async function savePropertyInfoToCloud(name){
-  const info = propertyInfo[name] || {};
+  const info = propInfo(name);
+  const first = info.contacts[0] || {};
+  const full = { name, address: info.address || '', contacts: info.contacts,
+    contact_name: first.name || '', contact_phone: first.phone || '', contact_email: first.email || '' };
+  const post = (payload) => fetch(SUPABASE_URL + '/rest/v1/property_directory', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(payload)
+  });
   try {
-    await fetch(SUPABASE_URL + '/rest/v1/property_directory', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ name, contact_name: info.contactName || '', contact_phone: info.contactPhone || '',
-        contact_email: info.contactEmail || '', address: info.address || '' })
-    });
+    let res = await post(full);
+    if (!res.ok) { const { contacts, ...noContacts } = full; res = await post(noContacts); } // older table w/o contacts column
   } catch(e) { console.error('savePropertyInfoToCloud failed (saved locally):', e); }
 }
-function setPropertyInfo(name, patch){
-  if (!name) return;
-  propertyInfo[name] = { ...(propertyInfo[name] || {}), ...patch };
-  savePropertyInfoLocal();
-  savePropertyInfoToCloud(name);
+function persistProperty(name){ savePropertyInfoLocal(); savePropertyInfoToCloud(name); }
+function setPropertyAddress(name, address){ propInfo(name).address = address; persistProperty(name); }
+function setContactField(name, idx, field, value){
+  const c = propInfo(name).contacts[idx]; if (!c) return;
+  c[field] = value;
+  if (field === 'title') addTitleOption(value);
+  persistProperty(name);
 }
+function addPropertyContact(name, contact){
+  propInfo(name).contacts.push(contact || { name:'', title:'', phone:'', email:'' });
+  if (contact && contact.title) addTitleOption(contact.title);
+  persistProperty(name);
+}
+function removePropertyContact(name, idx){ propInfo(name).contacts.splice(idx, 1); persistProperty(name); }
 
 // Seed the directory from existing jobs, then fill any job missing contact info.
 function reconcileContacts(){
-  let dirDirty = false, jobsDirty = false;
+  normalizePropertyInfo();
+  let jobsDirty = false;
+  const changedProps = new Set();
   boardJobs.forEach(j => {
-    if (!j.park) return;
-    const info = propertyInfo[j.park] || {};
-    const upd = {};
-    if (j.contact && !info.contactName) upd.contactName = j.contact;
-    if (j.contactPhone && !info.contactPhone) upd.contactPhone = j.contactPhone;
-    if (j.contactEmail && !info.contactEmail) upd.contactEmail = j.contactEmail;
-    if (Object.keys(upd).length) { propertyInfo[j.park] = { ...info, ...upd }; dirDirty = true; }
+    if (!j.park || !j.contact) return;
+    const info = propInfo(j.park);
+    if (!info.contacts.some(c => c.name === j.contact)) {
+      info.contacts.push({ name: j.contact, title: j.contactTitle || '', phone: j.contactPhone || '', email: j.contactEmail || '' });
+      if (j.contactTitle) addTitleOption(j.contactTitle);
+      changedProps.add(j.park);
+    }
   });
   boardJobs.forEach(j => {
     if (!j.park) return;
     const info = propertyInfo[j.park];
-    if (!info) return;
-    let ch = false;
-    if (!j.contact && info.contactName) { j.contact = info.contactName; ch = true; }
-    if (!j.contactPhone && info.contactPhone) { j.contactPhone = info.contactPhone; ch = true; }
-    if (!j.contactEmail && info.contactEmail) { j.contactEmail = info.contactEmail; ch = true; }
-    if (ch) { jobsDirty = true; saveBoardJobToCloud(j); }
+    if (!info || !info.contacts.length) return;
+    if (!j.contact) {
+      const c = info.contacts[0];
+      j.contact = c.name; j.contactTitle = c.title || ''; j.contactPhone = c.phone || ''; j.contactEmail = c.email || '';
+      jobsDirty = true; saveBoardJobToCloud(j);
+    }
   });
-  if (dirDirty) { savePropertyInfoLocal(); Object.keys(propertyInfo).forEach(n => savePropertyInfoToCloud(n)); }
+  if (changedProps.size) { savePropertyInfoLocal(); changedProps.forEach(n => savePropertyInfoToCloud(n)); }
   if (jobsDirty) saveBoardJobsLocal();
 }
 
@@ -2229,17 +2294,17 @@ function saveBoardJobsLocal(){ try { localStorage.setItem('boardJobs', JSON.stri
 // Contact name/phone/email are packed into the existing `contact` column as JSON,
 // so no new database columns are required.
 function packContact(j){
-  if (!(j.contact || j.contactPhone || j.contactEmail)) return '';
-  return JSON.stringify({ name: j.contact || '', phone: j.contactPhone || '', email: j.contactEmail || '' });
+  if (!(j.contact || j.contactPhone || j.contactEmail || j.contactTitle)) return '';
+  return JSON.stringify({ name: j.contact || '', title: j.contactTitle || '', phone: j.contactPhone || '', email: j.contactEmail || '' });
 }
 function unpackContact(raw){
-  if (!raw) return { contact:'', contactPhone:'', contactEmail:'' };
+  if (!raw) return { contact:'', contactTitle:'', contactPhone:'', contactEmail:'' };
   try {
     const v = JSON.parse(raw);
-    if (v && typeof v === 'object' && ('name' in v || 'phone' in v || 'email' in v))
-      return { contact: v.name || '', contactPhone: v.phone || '', contactEmail: v.email || '' };
+    if (v && typeof v === 'object' && ('name' in v || 'phone' in v || 'email' in v || 'title' in v))
+      return { contact: v.name || '', contactTitle: v.title || '', contactPhone: v.phone || '', contactEmail: v.email || '' };
   } catch(e){}
-  return { contact: String(raw), contactPhone:'', contactEmail:'' }; // legacy plain-text contact
+  return { contact: String(raw), contactTitle:'', contactPhone:'', contactEmail:'' }; // legacy plain-text contact
 }
 function jobToRow(j){
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
@@ -2607,6 +2672,8 @@ function showBoardJob(id) {
     <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
     <label class="fl">Contact Name</label>
     <input type="text" value="${escHtml(o.contact||'')}" placeholder="Name" onchange="editBoardJobField(${o.id},'contact',this.value)"/>
+    <label class="fl">Contact Title</label>
+    <input type="text" list="title-options" value="${escHtml(o.contactTitle||'')}" placeholder="e.g. Manager" onchange="editBoardJobField(${o.id},'contactTitle',this.value)"/>
     <label class="fl">Contact Phone</label>
     <input type="tel" inputmode="tel" value="${escHtml(o.contactPhone||'')}" placeholder="Phone number" onchange="editBoardJobField(${o.id},'contactPhone',this.value)"/>
     <label class="fl">Contact Email</label>
@@ -2628,6 +2695,7 @@ function editBoardJobField(id, field, value) {
   if (!o) return;
   if (field === 'total') o.total = parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
   else o[field] = value;
+  if (field === 'contactTitle') addTitleOption(value);
   persistBoardJob(o);
   if (field === 'type') showBoardJob(id);
 }
@@ -2718,11 +2786,11 @@ function njSetType(t) {
 function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
-  ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-phone','nj-contact-email'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
-  const hint = document.getElementById('nj-address-hint'); if (hint) hint.textContent = '';
+  njPropChange(); // resets the contact dropdown + address hint for the (empty) property
   njAttachments = [];
   njRenderAttachments();
   document.getElementById('nj-overlay').classList.add('show');
@@ -2785,17 +2853,37 @@ function njNewProperty() {
   const njPark = document.getElementById('nj-park'); if (njPark) { njPark.value = nm; njPropChange(); }
 }
 
-// When a property is picked, auto-fill its saved contact and show its address
+// When a property is picked, fill the contact dropdown and show its address
 function njPropChange() {
   const park = document.getElementById('nj-park').value;
   const info = propertyInfo[park];
-  if (info) {
-    if (info.contactName)  document.getElementById('nj-contact').value = info.contactName;
-    if (info.contactPhone) document.getElementById('nj-contact-phone').value = info.contactPhone;
-    if (info.contactEmail) document.getElementById('nj-contact-email').value = info.contactEmail;
-  }
+  const sel = document.getElementById('nj-contact-select');
+  const contacts = getContacts(park);
+  sel.innerHTML = contacts.map((c,i) => `<option value="${i}">${escHtml(c.name || '(no name)')}${c.title?' — '+escHtml(c.title):''}</option>`).join('')
+    + '<option value="new">+ New contact</option>';
+  if (contacts.length) { sel.value = '0'; njFillContact(contacts[0]); }
+  else { sel.value = 'new'; njFillContact(null); }
   const hint = document.getElementById('nj-address-hint');
   if (hint) hint.textContent = (info && info.address) ? ('📍 ' + info.address) : '';
+}
+function njFillContact(c){
+  document.getElementById('nj-contact').value = c ? (c.name || '') : '';
+  document.getElementById('nj-contact-title').value = c ? (c.title || '') : '';
+  document.getElementById('nj-contact-phone').value = c ? (c.phone || '') : '';
+  document.getElementById('nj-contact-email').value = c ? (c.email || '') : '';
+}
+function njPickContact(){
+  const v = document.getElementById('nj-contact-select').value;
+  if (v === 'new') { njFillContact(null); return; }
+  njFillContact(getContacts(document.getElementById('nj-park').value)[+v] || null);
+}
+function upsertPropertyContact(name, contact){
+  const info = propInfo(name);
+  const i = info.contacts.findIndex(c => c.name && c.name === contact.name);
+  if (i > -1) info.contacts[i] = { ...info.contacts[i], ...Object.fromEntries(Object.entries(contact).filter(([k,v]) => v)) };
+  else info.contacts.push({ name:contact.name||'', title:contact.title||'', phone:contact.phone||'', email:contact.email||'' });
+  if (contact.title) addTitleOption(contact.title);
+  persistProperty(name);
 }
 
 // ── Contacts / property directory screen ──────────────────
@@ -2809,25 +2897,37 @@ function renderContacts() {
   const el = document.getElementById('contacts-content');
   contactNames = Array.from(new Set([...properties, ...Object.keys(propertyInfo)])).sort((a,b) => a.localeCompare(b));
   if (!contactNames.length) { el.innerHTML = '<div class="empty">No properties yet. Add one from a new job.</div>'; return; }
-  el.innerHTML = contactNames.map((n, i) => {
-    const info = propertyInfo[n] || {};
+  el.innerHTML = contactNames.map((n, pi) => {
+    const info = propertyInfo[n] || { address:'', contacts:[] };
+    const contacts = Array.isArray(info.contacts) ? info.contacts : [];
+    const contactBlocks = contacts.map((c, ci) => `
+      <div class="contact-block">
+        <div class="contact-block-head">
+          <span class="contact-block-label">Contact ${ci+1}</span>
+          <button class="board-chk-del" onclick="removeContact(${pi},${ci})">×</button>
+        </div>
+        <label class="fl">Name</label>
+        <input type="text" value="${escHtml(c.name||'')}" placeholder="Name" onchange="editContact(${pi},${ci},'name',this.value)"/>
+        <label class="fl">Title</label>
+        <input type="text" list="title-options" value="${escHtml(c.title||'')}" placeholder="e.g. Manager" onchange="editContact(${pi},${ci},'title',this.value)"/>
+        <label class="fl">Phone</label>
+        <input type="tel" inputmode="tel" value="${escHtml(c.phone||'')}" placeholder="Phone" onchange="editContact(${pi},${ci},'phone',this.value)"/>
+        <label class="fl">Email</label>
+        <input type="email" inputmode="email" value="${escHtml(c.email||'')}" placeholder="Email" onchange="editContact(${pi},${ci},'email',this.value)"/>
+      </div>`).join('');
     return `<div class="detail-card">
       <div class="detail-card-title">${escHtml(n)}</div>
-      <label class="fl">Contact Name</label>
-      <input type="text" value="${escHtml(info.contactName||'')}" placeholder="Name" onchange="editPropInfoByIndex(${i},'contactName',this.value)"/>
-      <label class="fl">Phone</label>
-      <input type="tel" inputmode="tel" value="${escHtml(info.contactPhone||'')}" placeholder="Phone" onchange="editPropInfoByIndex(${i},'contactPhone',this.value)"/>
-      <label class="fl">Email</label>
-      <input type="email" inputmode="email" value="${escHtml(info.contactEmail||'')}" placeholder="Email" onchange="editPropInfoByIndex(${i},'contactEmail',this.value)"/>
       <label class="fl">Address</label>
-      <input type="text" value="${escHtml(info.address||'')}" placeholder="Street, city" onchange="editPropInfoByIndex(${i},'address',this.value)"/>
+      <input type="text" value="${escHtml(info.address||'')}" placeholder="Street, city" onchange="editPropAddress(${pi},this.value)"/>
+      ${contactBlocks || '<div class="att-empty" style="margin-top:10px">No contacts yet</div>'}
+      <button class="att-add" style="margin-top:10px" onclick="addContact(${pi})">＋ Add contact</button>
     </div>`;
   }).join('') + '<div style="height:32px"></div>';
 }
-function editPropInfoByIndex(i, field, value) {
-  const name = contactNames[i];
-  if (name) setPropertyInfo(name, { [field]: value });
-}
+function editPropAddress(pi, value){ const n = contactNames[pi]; if (n) setPropertyAddress(n, value); }
+function editContact(pi, ci, field, value){ const n = contactNames[pi]; if (n) setContactField(n, ci, field, value); }
+function addContact(pi){ const n = contactNames[pi]; if (n) { addPropertyContact(n, { name:'', title:'', phone:'', email:'' }); renderContacts(); } }
+function removeContact(pi, ci){ const n = contactNames[pi]; if (n && confirm('Remove this contact?')) { removePropertyContact(n, ci); renderContacts(); } }
 // Create one invoice-ready work order from a board Service Call
 function createWorkOrderFromJob(job) {
   const wo = {
@@ -2864,18 +2964,17 @@ function saveNewJob() {
     status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
+    contactTitle: document.getElementById('nj-contact-title').value.trim(),
     contactPhone: document.getElementById('nj-contact-phone').value.trim(),
     contactEmail: document.getElementById('nj-contact-email').value.trim(),
     otherNotes: '', total: 0
   };
   boardJobs.unshift(job);
   persistBoardJob(job);
-  // Remember this property's contact for next time (only non-empty fields)
-  const cUpd = {};
-  if (job.contact) cUpd.contactName = job.contact;
-  if (job.contactPhone) cUpd.contactPhone = job.contactPhone;
-  if (job.contactEmail) cUpd.contactEmail = job.contactEmail;
-  if (Object.keys(cUpd).length) setPropertyInfo(park, cUpd);
+  // Remember / update this property's contact for next time
+  if (job.contact || job.contactPhone || job.contactEmail) {
+    upsertPropertyContact(park, { name: job.contact, title: job.contactTitle, phone: job.contactPhone, email: job.contactEmail });
+  }
   // A Service Call automatically gets one invoice-ready work order
   if (job.type === 'service') createWorkOrderFromJob(job);
   njAttachments = [];
@@ -2932,6 +3031,8 @@ renderLabor();
 updateOrderCount();
 updateBoardCount();
 loadCloudData();
+normalizePropertyInfo();
+rebuildTitleDatalist();
 reconcileContacts(); // backfill from whatever is cached locally right away
 // Load the property directory + board jobs from the cloud, then backfill again
 (async () => {
