@@ -53,6 +53,8 @@ create table if not exists property_directory (
   contact_email text,
   address       text
 );
+-- Multiple contacts per property (each: name, title, phone, email) live here.
+alter table property_directory add column if not exists contacts jsonb default '[]'::jsonb;
 alter table property_directory enable row level security;
 drop policy if exists property_directory_all on property_directory;
 create policy property_directory_all on property_directory for all using (true) with check (true);
