@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: checklist-add-fix -->
+<!-- build: new-status-tag -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -139,6 +139,9 @@ textarea{resize:vertical;line-height:1.6}
 .board-card:active{box-shadow:0 2px 10px rgba(0,0,0,0.07)}
 .board-card.open{box-shadow:0 5px 20px rgba(0,0,0,0.11)}
 .board-card-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.board-new-pill{margin-left:auto;flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:0.6px;color:#fff;background:#FF375F;padding:2px 6px;border-radius:5px;box-shadow:0 0 0 0 rgba(255,55,95,0.5);animation:newpulse 1.8s ease-out infinite}
+@keyframes newpulse{0%{box-shadow:0 0 0 0 rgba(255,55,95,0.45)}70%{box-shadow:0 0 0 6px rgba(255,55,95,0)}100%{box-shadow:0 0 0 0 rgba(255,55,95,0)}}
+@media (prefers-reduced-motion: reduce){.board-new-pill{animation:none}}
 .board-badge{font-size:9.5px;font-weight:700;letter-spacing:0.5px;padding:2px 6px;border-radius:5px;flex-shrink:0}
 .board-badge-proj{background:#e5f1fd;color:#1e7fd8}
 .board-badge-svc{background:#ececef;color:#6a6a6e}
@@ -2146,6 +2149,38 @@ const STAGES = [
 let boardJobs = [];
 try { boardJobs = JSON.parse(localStorage.getItem('boardJobs') || '[]'); } catch(e){}
 let boardFilter = 'all';
+
+// ── "NEW / status changed" markers (per DEVICE) ─────────────────────────────
+// There is no login, so each phone tracks its own "seen" state. Every device
+// remembers the stage it last saw for each job; a job shows a NEW tag when its
+// current stage differs from that (or the job appeared after this device's
+// baseline). The tag clears for a person only once they open that job.
+let seenStages = {};
+try { seenStages = JSON.parse(localStorage.getItem('seenStages') || '{}') || {}; } catch(e){ seenStages = {}; }
+function saveSeenStages(){ try { localStorage.setItem('seenStages', JSON.stringify(seenStages)); } catch(e){} }
+// One-time baseline the first time this device runs with the feature: mark every
+// existing job as already seen, so the board doesn't light up with NEW tags.
+// Only lock the baseline in once we have the authoritative cloud list.
+function ensureSeenBaseline(persist){
+  let done = false;
+  try { done = localStorage.getItem('seenStagesInit') === '1'; } catch(e){}
+  if (done) return;
+  boardJobs.forEach(o => { if (o && o.id != null) seenStages[o.id] = normalizeStage(o.status); });
+  saveSeenStages();
+  if (persist) { try { localStorage.setItem('seenStagesInit', '1'); } catch(e){} }
+}
+function isJobNew(o){
+  if (!o || o.id == null) return false;
+  const seen = seenStages[o.id];
+  if (seen === undefined) return true;            // appeared since this device's baseline
+  return normalizeStage(o.status) !== seen;       // stage changed since this device last saw it
+}
+function markJobSeen(id){
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  const cur = normalizeStage(o.status);
+  if (seenStages[id] !== cur) { seenStages[id] = cur; saveSeenStages(); refreshBoardViews(); }
+}
 let expandedBoardId = null;
 let currentBoardJobId = null;
 let boardZoom = 1;
@@ -2340,15 +2375,18 @@ function rowToJob(r){
 }
 
 async function loadBoardJobsFromCloud(){
+  let ok = false;
   try {
     const rows = await sbFetch('board_jobs?order=created_at.desc');
     if (rows && rows.length !== undefined) {
       boardJobs = rows.map(rowToJob);
       saveBoardJobsLocal();
+      ok = true;
     }
   } catch(e) {
     console.error('loadBoardJobsFromCloud failed (using local board):', e);
   }
+  ensureSeenBaseline(ok);
   if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   updateBoardCount();
 }
@@ -2421,6 +2459,7 @@ function boardCardHtml(o) {
     <div class="board-card-top">
       <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'Project':'Service'}</span>
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
+      ${isJobNew(o)?'<span class="board-new-pill" title="New — status changed since you last opened it">NEW</span>':''}
     </div>
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
@@ -2588,12 +2627,14 @@ function boardDetailHtml(o) {
 function boardCardClick(ev, id) {
   if (ev.target.closest('.board-check li, .remove-link, .board-open-link, .move-sel, .board-chk-add')) return;
   // When zoomed out, a tap opens the full view instead of expanding inline
-  if (boardZoom < 0.6) { showBoardJob(id); return; }
+  if (boardZoom < 0.6) { markJobSeen(id); showBoardJob(id); return; }
   toggleBoardCard(id);
 }
 function toggleBoardCard(id) {
+  const opening = expandedBoardId !== id;
   expandedBoardId = expandedBoardId === id ? null : id;
   renderBoard();
+  if (opening) markJobSeen(id); // viewing the card clears its NEW tag for this device
 }
 
 function renderBoard() {
@@ -2750,6 +2791,7 @@ function moveBoardStage(id, stage) {
   }
   o.status = stage;
   persistBoardJob(o);
+  seenStages[id] = normalizeStage(stage); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
 }
 function answerPermit(yes) {
@@ -2759,6 +2801,7 @@ function answerPermit(yes) {
   if (!o) return;
   o.status = yes ? 'Permit Pending' : 'Ready to Schedule';
   persistBoardJob(o);
+  seenStages[id] = normalizeStage(o.status); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
 }
 function toggleChecklistItem(id, i) {
@@ -3048,6 +3091,7 @@ function saveNewJob() {
   };
   boardJobs.unshift(job);
   persistBoardJob(job);
+  seenStages[job.id] = normalizeStage(job.status); saveSeenStages(); // you added it — not "new" to you
   // Remember / update this property's contact for next time
   if (job.contact || job.contactPhone || job.contactEmail) {
     upsertPropertyContact(park, { name: job.contact, title: job.contactTitle, phone: job.contactPhone, email: job.contactEmail });
