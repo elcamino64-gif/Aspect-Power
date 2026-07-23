@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: new-status-tag -->
+<!-- build: new-job-tag -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2459,7 +2459,7 @@ function boardCardHtml(o) {
     <div class="board-card-top">
       <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'Project':'Service'}</span>
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
-      ${isJobNew(o)?'<span class="board-new-pill" title="New — status changed since you last opened it">NEW</span>':''}
+      ${isJobNew(o)?'<span class="board-new-pill" title="New — just added or its status changed since you last opened it">NEW</span>':''}
     </div>
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
@@ -3091,7 +3091,8 @@ function saveNewJob() {
   };
   boardJobs.unshift(job);
   persistBoardJob(job);
-  seenStages[job.id] = normalizeStage(job.status); saveSeenStages(); // you added it — not "new" to you
+  // A freshly added job carries a NEW tag for everyone (including the person who
+  // added it) until each person opens it — so new jobs stand out on the board.
   // Remember / update this property's contact for next time
   if (job.contact || job.contactPhone || job.contactEmail) {
     upsertPropertyContact(park, { name: job.contact, title: job.contactTitle, phone: job.contactPhone, email: job.contactEmail });
