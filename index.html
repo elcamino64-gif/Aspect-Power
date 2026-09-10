@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: locked-attachments-edit -->
+<!-- build: stage-dropdown-inline -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -217,6 +217,7 @@ textarea{resize:vertical;line-height:1.6}
 .bj-titlerow .bj-title{flex:1;margin-bottom:12px}
 .bj-edit-btn{flex-shrink:0;margin-top:2px;background:#eaf4fe;color:#2e97f2;border:none;font-size:14px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;font-family:inherit}
 .bj-edit-btn.done{background:#2e97f2;color:#fff}
+.bj-stage-sel{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:14px;font-weight:600;color:#1d1d1f;background:#f5f5f7;border:1px solid #e0e0e5;border-radius:9px;padding:8px 32px 8px 12px;margin-top:2px;cursor:pointer;max-width:100%;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 /* Clean read-only grouping (view mode) */
 .bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
@@ -3156,10 +3157,13 @@ function renderBoardJob(id) {
            <button type="button" class="btn-ghost" style="flex-shrink:0;padding:8px 10px" onclick="editBoardJobField(${o.id},'scheduledDate',''); renderBoardJob(${o.id})">Clear</button>
          </div>`
       : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`;
+    // Stage is changeable right here, without tapping Edit.
+    const stageControl = `<select class="bj-stage-sel" onchange="moveBoardStage(${o.id}, this.value)">${STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('')}</select>`;
     top = `
       <div class="bj-group">
         <div class="bj-row"><div class="l">Scheduled</div><div class="v">${schedControl}</div></div>
-        ${row('Stage', escHtml(normalizeStage(o.status)))}
+        <div class="bj-row"><div class="l">Stage</div><div class="v">${stageControl}</div></div>`;
+    top += `
         ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
         ${o.description ? row('Description', escHtml(o.description)) : ''}
         ${o.statusTag ? row('Status', escHtml(o.statusTag)) : ''}
