@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fullview-clean-v2 -->
+<!-- build: hide-empty-date-placeholder -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -207,6 +207,8 @@ textarea{resize:vertical;line-height:1.6}
 .bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
 .bj-title{font-size:22px;font-weight:800;color:#1d1d1f;margin:0 2px 12px;line-height:1.15}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
+/* Hide the browser's today's-date placeholder on an empty date field until it's focused or a date is picked */
+input[type=date].nodate:not(:focus)::-webkit-datetime-edit{color:transparent}
 .navtrio{display:flex;gap:6px;flex-wrap:wrap;width:100%;justify-content:center}
 .navtrio .btn-ghost{padding:7px 13px;font-size:13px}
 .navtrio .btn-ghost.on{background:#05befe;border-color:#05befe;color:#fff}
@@ -478,7 +480,7 @@ textarea{resize:vertical;line-height:1.6}
       <select id="nj-stage"></select>
 
       <label class="fl">Scheduled For</label>
-      <input type="date" id="nj-sched"/>
+      <input type="date" id="nj-sched" class="nodate" onchange="this.classList.toggle('nodate', !this.value)"/>
 
       <label class="fl">Added By</label>
       <select id="nj-by"><option value="">Select...</option></select>
@@ -3001,7 +3003,7 @@ function showBoardJob(id) {
     <div class="bj-title">${escHtml(o.park||'—')}</div>
 
     <label class="fl">Scheduled For</label>
-    <input type="date" value="${escHtml(o.scheduledDate||'')}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value)"/>
+    <input type="date" class="${o.scheduledDate?'':'nodate'}" value="${escHtml(o.scheduledDate||'')}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); this.classList.toggle('nodate', !this.value)"/>
     <label class="fl">Stage</label>
     <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
     <label class="fl">Added By</label>
@@ -3161,6 +3163,7 @@ function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
   ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email','nj-sched'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const njSched = document.getElementById('nj-sched'); if (njSched) njSched.classList.add('nodate'); // blank until a date is picked
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
