@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: mileage-fuel-autofill -->
+<!-- build: mileage-list-2 -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1062,19 +1062,26 @@ const DEFAULT_MILEAGE = {
   'Clayton Palms': 50, 'Colonial Mobile Manor': 126, 'Concord Cascade': 0,
   'Concord Mobile CC': 0, 'Contempo Marin': 72, 'Crestview Mobile': 0,
   'De Anza Santa Cruz': 176, 'Diablo Mobile Lodge': 0, 'Eagle City Mobile': 48,
-  'Eastridge Estates': 110, 'Fairway Oaks': 368, 'Hayward Mobile CC': 80,
-  'Imperial Stockton': 120, 'La Buona Vita': 110, 'La Siesta Village': 68,
-  'Lamplighter – San Jose': 106, 'Leisure Lake': 96, 'Marin Valley CC': 78,
+  'Eastridge Estates': 110, 'Fairway Oaks': 368, 'Hayward Mobile CC': 70,
+  'Imperial Stockton': 120, 'La Buona Vita': 110, 'La Siesta Village': 70,
+  'Lamplighter – San Jose': 106, 'Leisure Lake': 96, 'Marin Valley CC': 74,
   'Meadows': 26, 'Monte Del Lago': 109, 'Napa Valley MHP': 70,
   'Newells Mobile City': 68, 'Oakcrest Estates': 104, 'Oaktree Vineyard': 70,
-  'Orchard Estates': 110, 'Plaza Del Rey': 110, 'Paso De Palomas': 122,
+  'Orchard Estates': 110, 'Plaza Del Rey': 110, 'Paso De Palomas': 130,
   'Pueblo Serena': 82, 'Rancho Benicia': 13, 'Rancho Cabeza': 118,
   'Rancho De Calistoga': 114, 'Rancho De Napa': 78, 'Rancho Diablo': 0,
-  'Rincon Valley': 94, 'San Jose Verde': 120, 'Santa Rosa Village': 124,
-  'Shadow Lake': 122, 'Sierra Lakes': 170, 'Silicon Valley Village': 104,
-  'Spanish Ranch': 86, 'Summerfield @ Canyon Creek': 36, 'Sunshadow MHP': 114,
-  'Tahoe Verde': 322, 'Valhalla MHP': 116, 'Village of the Four Seasons': 128,
-  'Walnut Acres': 68, 'Winters MHP': 90, 'Woodgate': 58
+  'Rincon Valley': 114, 'San Jose Verde': 120, 'Santa Rosa Village': 116,
+  'Shadow Lake': 122, 'Sierra Lakes': 170, 'Silicon Valley Village': 110,
+  'Spanish Ranch': 82, 'Summerfield @ Canyon Creek': 36, 'Sunshadow MHP': 114,
+  'Tahoe Verde': 322, 'Valhalla MHP': 118, 'Village of the Four Seasons': 128,
+  'Walnut Acres': 58, 'Winters MHP': 90, 'Woodgate': 58,
+  // Added from the second mileage list
+  'Adobe Wells': 112, 'La Canada': 220, 'Spanish Cove': 120, 'Somerset': 108,
+  'Sunshine': 114, 'Treasure Island': 90, 'Woodland Estates': 158,
+  // Alternate spellings, so they match whatever name the app has stored
+  'Eagle City': 48, 'Hayward Mobile Country Club': 70,
+  'Marine Valley Mobile Country Club': 74, 'Napa Valley': 70,
+  'Paseo de Palomas': 130, 'Summerfield at Canyon Creek': 36, 'Valhalla': 118
 };
 function normPark(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 const DEFAULT_MILEAGE_NORM = {};
