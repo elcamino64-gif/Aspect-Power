@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: title-aspect-power -->
+<!-- build: sunshadow-mileage-delete-wo -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1078,16 +1078,26 @@ const DEFAULT_MILEAGE = {
   'Paseo de Palomas': 130, 'Summerfield at Canyon Creek': 36, 'Valhalla': 118
 };
 function normPark(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+// Loose key: also drop a trailing "mhp" / "cc" / "mhc" so "Sunshadow" matches
+// "Sunshadow MHP", "Napa Valley" matches "Napa Valley MHP", etc.
+function loosePark(s){ return normPark(s).replace(/(mhp|mhc|cc)$/,''); }
 const DEFAULT_MILEAGE_NORM = {};
-Object.keys(DEFAULT_MILEAGE).forEach(k => { DEFAULT_MILEAGE_NORM[normPark(k)] = DEFAULT_MILEAGE[k]; });
+const DEFAULT_MILEAGE_LOOSE = {};
+Object.keys(DEFAULT_MILEAGE).forEach(k => {
+  DEFAULT_MILEAGE_NORM[normPark(k)] = DEFAULT_MILEAGE[k];
+  DEFAULT_MILEAGE_LOOSE[loosePark(k)] = DEFAULT_MILEAGE[k];
+});
 // Round-trip miles for a property: a hand-saved value wins, else the sheet
-// (matched ignoring case, spaces and punctuation). null if unknown.
+// (matched ignoring case, spaces and punctuation, then ignoring an MHP/CC
+// suffix). null if unknown.
 function lookupMileage(property){
   if (!property) return null;
   const man = mileageDB[property];
   if (man != null && String(man).trim() !== '') { const v = parseFloat(man); if (!isNaN(v)) return v; }
-  const d = DEFAULT_MILEAGE_NORM[normPark(property)];
-  return (d != null) ? d : null;
+  const exact = DEFAULT_MILEAGE_NORM[normPark(property)];
+  if (exact != null) return exact;
+  const loose = DEFAULT_MILEAGE_LOOSE[loosePark(property)];
+  return (loose != null) ? loose : null;
 }
 function fuelCostFor(property){ const m = lookupMileage(property); return m != null ? m * FUEL_RATE : 0; }
 // Grand total of an order, always including the fuel surcharge for its property,
@@ -1854,6 +1864,7 @@ function showDetail(id) {
     </div>
     <button class="btn-primary" onclick="editOrder(${o.id})" style="margin-top:0">✏️ Edit Work Order</button>
     <button class="btn-primary" onclick="sendOrder(${o.id})" style="margin-top:10px">📧 Send</button>
+    <button class="btn-ghost" onclick="deleteOrder(${o.id})" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:10px">🗑 Delete Work Order</button>
     <div style="height:32px"></div>
   `;
 }
@@ -1934,11 +1945,11 @@ function cardTap(id) {
 
 // ── DELETE ────────────────────────────────────────────────
 function deleteOrder(id) {
-  if (!confirm('Delete this work order?')) return;
+  if (!confirm('Delete this work order? This cannot be undone.')) return;
   orders = orders.filter(o => o.id !== id);
   try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
   deleteOrderFromCloud(id);
-  renderList();
+  showList();
 }
 
 // ── SEND EMAIL ────────────────────────────────────────────
