@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: card-scheduled-label -->
+<!-- build: job-address-contact -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2871,6 +2871,8 @@ function closeLightbox() { document.getElementById('att-lightbox').classList.rem
 
 function boardDetailHtml(o) {
   let h = '<div class="board-detail">';
+  const addr = formatAddress(propertyInfo[o.park]);
+  if (addr) h += `<div class="drow"><span class="k">Address</span><span class="v"><a class="contact-link" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" onclick="event.stopPropagation()">📍 ${escHtml(addr)}</a></span></div>`;
   if (o.spaceLocation) h += `<div class="drow"><span class="k">Location</span><span class="v">${escHtml(o.spaceLocation)}</span></div>`;
   if (o.contact || o.contactPhone || o.contactEmail) {
     let v = escHtml(o.contact || '');
@@ -3000,6 +3002,14 @@ function showBoardJob(id) {
     <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
     <label class="fl">Park / Property</label>
     <select onchange="editBoardJobField(${o.id},'park',this.value)">${parkOpts}</select>
+    <label class="fl">Property Address</label>
+    <input type="text" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].address)||'')}" placeholder="Street address" onchange="setJobPropField(${o.id},'address',this.value)"/>
+    <div style="display:flex;gap:8px">
+      <div style="flex:2"><label class="fl">City</label><input type="text" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].city)||'')}" placeholder="City" onchange="setJobPropField(${o.id},'city',this.value)"/></div>
+      <div style="flex:1"><label class="fl">State</label><input type="text" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].state)||'')}" placeholder="State" onchange="setJobPropField(${o.id},'state',this.value)"/></div>
+      <div style="flex:1"><label class="fl">Zip</label><input type="text" inputmode="numeric" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].zip)||'')}" placeholder="Zip" onchange="setJobPropField(${o.id},'zip',this.value)"/></div>
+    </div>
+    <div style="font-size:11px;color:#86868b;margin-top:4px">Address is saved for this property and used on all its jobs.</div>
     <label class="fl">Space / Location</label>
     <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, address, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
     <label class="fl">Description</label>
@@ -3025,7 +3035,7 @@ function showBoardJob(id) {
   `;
 }
 
-// Edit a single field on a board job (auto-saves). Only 'type' needs a re-render.
+// Edit a single field on a board job (auto-saves).
 function editBoardJobField(id, field, value) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
@@ -3033,7 +3043,20 @@ function editBoardJobField(id, field, value) {
   else o[field] = value;
   if (field === 'contactTitle') addTitleOption(value);
   persistBoardJob(o);
-  if (field === 'type') showBoardJob(id);
+  // Remember this job's contact on the property directory automatically, so it
+  // carries to future jobs at the same property.
+  if ((field === 'contact' || field === 'contactTitle' || field === 'contactPhone' || field === 'contactEmail')
+      && o.park && o.contact && o.contact.trim()) {
+    upsertPropertyContact(o.park, { name: o.contact, title: o.contactTitle, phone: o.contactPhone, email: o.contactEmail });
+  }
+  if (field === 'type' || field === 'park') showBoardJob(id); // refresh the shown address/contact for the new property
+}
+// Edit the property's address from a job — saved to the property directory
+// (shared by every job at that property).
+function setJobPropField(id, field, value) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o || !o.park) { alert('Choose a Park / Property first.'); return; }
+  setPropertyField(o.park, field, value);
 }
 
 function saveBoardJobDone(id) {
