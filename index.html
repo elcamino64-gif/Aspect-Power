@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: attach-dropdown -->
+<!-- build: locked-attachments-edit -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -213,6 +213,10 @@ textarea{resize:vertical;line-height:1.6}
 .att-file-name{font-size:9px;color:#3a3a3c;text-align:center;line-height:1.15;max-height:22px;overflow:hidden;width:100%;word-break:break-word}
 .bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
 .bj-title{font-size:22px;font-weight:800;color:#1d1d1f;margin:0 2px 12px;line-height:1.15}
+.bj-titlerow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.bj-titlerow .bj-title{flex:1;margin-bottom:12px}
+.bj-edit-btn{flex-shrink:0;margin-top:2px;background:#eaf4fe;color:#2e97f2;border:none;font-size:14px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;font-family:inherit}
+.bj-edit-btn.done{background:#2e97f2;color:#fff}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 /* Clean read-only grouping (view mode) */
 .bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
@@ -499,9 +503,6 @@ textarea{resize:vertical;line-height:1.6}
       <label class="fl">Scheduled For</label>
       <button type="button" id="nj-sched-btn" class="bj-setdate" onclick="njRevealSched()">📅 Tap to set a scheduled date</button>
       <input type="date" id="nj-sched" style="display:none"/>
-
-      <label class="fl">Added By</label>
-      <select id="nj-by"><option value="">Select...</option></select>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -2790,11 +2791,12 @@ function fileMeta(a) {
   return { label: ext ? ext.toUpperCase().slice(0, 4) : 'FILE', color: '#8a8a8e', kind: 'Document' };
 }
 
-function renderAtt(o, a) {
+function renderAtt(o, a, editable) {
   const isImg = a.type && a.type.indexOf('image/') === 0;
-  if (isImg) return `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
+  const del = editable ? `<button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button>` : '';
+  if (isImg) return `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/>${del}</div>`;
   const m = fileMeta(a);
-  return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="openAttachment(${o.id},${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
+  return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="openAttachment(${o.id},${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span>${del}</div>`;
 }
 
 // The single "Add attachment" dropdown (choose a category, then pick files).
@@ -2806,15 +2808,19 @@ function attAdderHtml(id, onchange, inputId, inputOnchange) {
     </div>`;
 }
 
-function attachmentsHtml(o) {
+function attachmentsHtml(o, editable) {
   const atts = Array.isArray(o.attachments) ? o.attachments : [];
   let h = '';
   ATT_CATS.forEach(cat => {
     const items = atts.filter(a => (a.category || 'Other') === cat);
     if (!items.length) return;
-    h += `<div class="att-cat"><div class="att-cat-label">${cat}</div><div class="att-grid">${items.map(a => renderAtt(o, a)).join('')}</div></div>`;
+    h += `<div class="att-cat"><div class="att-cat-label">${cat}</div><div class="att-grid">${items.map(a => renderAtt(o, a, editable)).join('')}</div></div>`;
   });
-  h += attAdderHtml(o.id, `pickAttachmentCategory(this,${o.id})`, `att-file-${o.id}`, `handleAttachmentPick(event,${o.id},this.dataset.category)`);
+  if (editable) {
+    h += attAdderHtml(o.id, `pickAttachmentCategory(this,${o.id})`, `att-file-${o.id}`, `handleAttachmentPick(event,${o.id},this.dataset.category)`);
+  } else if (!atts.length) {
+    h += `<div class="att-empty">No attachments yet. Tap Edit to add.</div>`;
+  }
   return h;
 }
 
@@ -3119,9 +3125,6 @@ function renderBoardJob(id) {
   let top;
   if (boardJobEditMode) {
     const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
-    const techList = technicians.slice();
-    if (o.by && !techList.includes(o.by)) techList.unshift(o.by);
-    const techOpts = techList.map(t => `<option value="${escHtml(t)}"${t===o.by?' selected':''}>${escHtml(t)}</option>`).join('');
     top = `
       <label class="fl">Scheduled For</label>
       ${o.scheduledDate
@@ -3132,8 +3135,6 @@ function renderBoardJob(id) {
         : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`}
       <label class="fl">Stage</label>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
-      <label class="fl">Added By</label>
-      <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
       <label class="fl">Job Location</label>
       <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
       <label class="fl">Description</label>
@@ -3145,8 +3146,7 @@ function renderBoardJob(id) {
       <div class="bj-static"${jobAddr?'':' style="color:#86868b;font-weight:400"'}>${jobAddr?addrHtml:'No address on file yet.'}</div>
       <label class="fl">Contact</label>
       <div class="bj-static"${hasContact?'':' style="color:#86868b;font-weight:400"'}>${hasContact?contactHtml:'No contact on file yet.'}</div>
-      <div style="font-size:11px;color:#86868b;margin:8px 2px 0">Address &amp; contact are managed on the Contacts screen.</div>
-      <button class="btn-primary" style="margin-top:22px" onclick="doneEditBoardJob(${o.id})">✓ Done</button>`;
+      <div style="font-size:11px;color:#86868b;margin:8px 2px 0">Address &amp; contact are managed on the Contacts screen.</div>`;
   } else {
     const row = (l, v, muted) => `<div class="bj-row"><div class="l">${l}</div><div class="v${muted?' muted':''}">${v}</div></div>`;
     // Scheduling is available right here, without tapping Edit.
@@ -3160,21 +3160,23 @@ function renderBoardJob(id) {
       <div class="bj-group">
         <div class="bj-row"><div class="l">Scheduled</div><div class="v">${schedControl}</div></div>
         ${row('Stage', escHtml(normalizeStage(o.status)))}
-        ${row('Added By', escHtml(o.by||'—'), !o.by)}
         ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
         ${o.description ? row('Description', escHtml(o.description)) : ''}
         ${o.statusTag ? row('Status', escHtml(o.statusTag)) : ''}
         ${row('Property Address', addrHtml, !jobAddr)}
         ${row('Contact', contactHtml, !hasContact)}
-      </div>
-      <button class="btn-primary" onclick="editBoardJob(${o.id})">✏️ Edit details</button>`;
+      </div>`;
   }
 
+  const editToggle = boardJobEditMode
+    ? `<button class="bj-edit-btn done" onclick="doneEditBoardJob(${o.id})">✓ Done</button>`
+    : `<button class="bj-edit-btn" onclick="editBoardJob(${o.id})">✏️ Edit</button>`;
   document.getElementById('boardjob-content').innerHTML = `
-    <div class="bj-title">${escHtml(o.park||'—')}</div>
+    <div class="bj-titlerow"><div class="bj-title">${escHtml(o.park||'—')}</div>${editToggle}</div>
     ${top}
     <label class="fl" style="margin-top:22px">Attachments</label>
-    ${attachmentsHtml(o)}
+    ${attachmentsHtml(o, boardJobEditMode)}
+    ${boardJobEditMode ? `<button class="btn-primary" style="width:100%;margin-top:22px" onclick="doneEditBoardJob(${o.id})">✓ Done</button>` : ''}
     <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
@@ -3574,10 +3576,10 @@ function createWorkOrderFromJob(job) {
 }
 
 function saveNewJob() {
-  const by = document.getElementById('nj-by').value;
+  const byEl = document.getElementById('nj-by');
+  const by = byEl ? byEl.value : '';
   const park = document.getElementById('nj-park').value;
   if (!park) { alert('Please choose a Park / Property.'); return; }
-  if (!by) { alert('Please choose a Technician.'); return; }
   const today = new Date();
   const dateStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
   const stage = document.getElementById('nj-stage').value || 'Inquiries';
