@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: set-date-button -->
+<!-- build: unified-accent -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -23,16 +23,16 @@ input[type=date]{color-scheme:light}
 .scroll{flex:1;overflow-y:auto;padding:20px 16px;background:#f5f5f7}
 .section{margin-bottom:28px}
 .section-title{font-size:13px;font-weight:600;color:#1d1d1f;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #d2d2d7}
-label.field-label{display:block;font-size:11px;color:#86868b;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;font-weight:500}
+label.field-label{display:block;font-size:11px;color:#86868b;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;font-weight:700}
 input,textarea,select{background:#fff;border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;color:#1d1d1f;font-size:15px;outline:none;width:100%;transition:border-color 0.2s}
-input:focus,textarea:focus,select:focus{border-color:#05befe}
+input:focus,textarea:focus,select:focus{border-color:#2e97f2}
 textarea{resize:vertical;line-height:1.6}
-.btn-primary{width:100%;padding:16px;border-radius:14px;border:none;background:#05befe;color:#000;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.01em;transition:opacity 0.2s}
+.btn-primary{width:100%;padding:16px;border-radius:14px;border:none;background:#2e97f2;color:#fff;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.01em;transition:opacity 0.2s}
 .btn-primary:active{opacity:0.8}
 .btn-ghost{background:none;border:1px solid #d2d2d7;color:#1d1d1f;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer}
-.btn-ghost.active{background:#05befe;border-color:#05befe;color:#000}
-.btn-add{background:none;border:1px dashed #05befe;color:#05befe;border-radius:12px;padding:10px 14px;font-size:14px;font-weight:500;cursor:pointer;width:100%;margin-bottom:14px;transition:background 0.2s}
-.btn-add:active{background:#05befe18}
+.btn-ghost.active{background:#2e97f2;border-color:#2e97f2;color:#fff}
+.btn-add{background:none;border:1px dashed #2e97f2;color:#2e97f2;border-radius:12px;padding:10px 14px;font-size:14px;font-weight:500;cursor:pointer;width:100%;margin-bottom:14px;transition:background 0.2s}
+.btn-add:active{background:#2e97f218}
 .mat-row{display:flex;gap:6px;margin-bottom:8px;align-items:flex-start}
 .mat-row input{flex:1}
 .mat-row input.qty{flex:0 0 60px}
@@ -47,15 +47,15 @@ textarea{resize:vertical;line-height:1.6}
 .labor-row{display:flex;gap:8px;margin-bottom:10px;align-items:center}
 .labor-row input{flex:1}
 .type-btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#f2f2f7;color:#86868b;transition:all 0.15s}
-.type-btn.active-rt{background:#05befe;color:#000}
+.type-btn.active-rt{background:#2e97f2;color:#fff}
 .type-btn.active-ot{background:#f59e0b;color:#000}
 .status-btns{display:flex;gap:10px;margin-bottom:12px}
 .status-btn{flex:1;padding:10px;border-radius:12px;border:1px solid transparent;cursor:pointer;font-size:13px;font-weight:700;background:#f2f2f7;color:#86868b;transition:all 0.15s}
 .status-btn.complete{background:#22c55e18;border-color:#22c55e;color:#22c55e}
 .status-btn.inprogress{background:#f59e0b18;border-color:#f59e0b;color:#f59e0b}
-.total-box{background:#fff;border:1px solid #05befe;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;box-shadow:0 0 0 4px #05befe15}
+.total-box{background:#fff;border:1px solid #2e97f2;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;box-shadow:0 0 0 4px #2e97f215}
 .total-label{color:#86868b;font-size:13px;font-weight:500}
-.total-amount{color:#05befe;font-size:28px;font-weight:700}
+.total-amount{color:#2e97f2;font-size:28px;font-weight:700}
 .subtotal-row{display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px;gap:10px}
 .subtotal-label{color:#86868b;font-size:12px}
 .subtotal-value{color:#1d1d1f;font-size:14px;font-weight:600}
@@ -67,7 +67,7 @@ textarea{resize:vertical;line-height:1.6}
 .order-card-delete p{color:#fff;font-size:11px;font-weight:700}
 .order-title{font-weight:600;font-size:15px;color:#1d1d1f;margin-bottom:4px}
 .order-meta{font-size:12px;color:#86868b;margin-bottom:4px}
-.order-amount{font-size:15px;font-weight:700;color:#05befe}
+.order-amount{font-size:15px;font-weight:700;color:#2e97f2}
 .order-row{display:flex;justify-content:space-between;align-items:center}
 .status-badge{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600}
 .badge-complete{background:#22c55e18;color:#22c55e}
@@ -78,7 +78,7 @@ textarea{resize:vertical;line-height:1.6}
 .detail-label{color:#86868b}
 .detail-value{color:#1d1d1f;font-weight:500;text-align:right;max-width:60%}
 .detail-card{background:#fff;border-radius:14px;padding:16px;border:1px solid #d2d2d7;margin-top:12px}
-.detail-card-title{font-size:11px;color:#05befe;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px}
+.detail-card-title{font-size:11px;color:#2e97f2;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px}
 .detail-card-text{color:#1d1d1f;line-height:1.7;font-size:14px}
 .search-wrap{position:relative;margin-bottom:16px}
 .search-wrap input{padding-left:36px}
@@ -86,17 +86,17 @@ textarea{resize:vertical;line-height:1.6}
 .empty{text-align:center;color:#86868b;padding:60px 20px;font-size:15px}
 .checkbox-row{display:flex;align-items:center;gap:8px;cursor:pointer}
 .checkbox{width:22px;height:22px;border-radius:6px;border:2px solid #d2d2d7;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;flex-shrink:0}
-.checkbox.checked{background:#05befe;border-color:#05befe}
-.checkbox.checked::after{content:"✓";color:#000;font-size:13px;font-weight:800}
+.checkbox.checked{background:#2e97f2;border-color:#2e97f2}
+.checkbox.checked::after{content:"✓";color:#fff;font-size:13px;font-weight:800}
 /* Modal */
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal-box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 .modal-title{font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:16px}
 .modal-input{width:100%;border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;font-size:15px;outline:none;margin-bottom:8px;box-sizing:border-box}
-.modal-input:focus{border-color:#05befe}
+.modal-input:focus{border-color:#2e97f2}
 .modal-btns{display:flex;gap:10px;margin-top:16px}
 .modal-btn-cancel{flex:1;padding:12px;border-radius:10px;border:1px solid #d2d2d7;background:#f5f5f7;color:#1d1d1f;font-size:15px;font-weight:500;cursor:pointer}
-.modal-btn-confirm{flex:1;padding:12px;border-radius:10px;border:none;background:#05befe;color:#000;font-size:15px;font-weight:700;cursor:pointer}
+.modal-btn-confirm{flex:1;padding:12px;border-radius:10px;border:none;background:#2e97f2;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
 .manage-mat-list{max-height:340px;overflow-y:auto;margin-bottom:8px}
 .manage-mat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f2f2f7}
 .manage-mat-info{flex:1;min-width:0}
@@ -109,7 +109,7 @@ textarea{resize:vertical;line-height:1.6}
 .board-toolbar{padding:20px 16px 2px;flex-shrink:0;display:flex;align-items:center;gap:12px}
 .seg{display:flex;gap:8px;flex:1}
 .seg button{flex:1;border:1px solid #d2d2d7;background:#fff;color:#3a3a3c;font-size:13.5px;font-weight:600;padding:9px 0;border-radius:11px;cursor:pointer;font-family:inherit;transition:0.12s}
-.seg button.on{background:#05befe;border-color:#05befe;color:#fff}
+.seg button.on{background:#2e97f2;border-color:#2e97f2;color:#fff}
 .swipe-hint{font-size:11px;color:#86868b;white-space:nowrap}
 .addbar{padding:10px 16px 2px;flex-shrink:0}
 .add-new{width:100%;border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:15px;font-weight:600;padding:12px 0;border-radius:12px;cursor:pointer;font-family:inherit}
@@ -148,7 +148,7 @@ textarea{resize:vertical;line-height:1.6}
 .board-card-park{font-size:15px;font-weight:600;line-height:1.2;color:#1d1d1f}
 .board-card-scope{font-size:13px;color:#3a3a3c;line-height:1.4}
 .board-card-meta{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}
-.board-sched{font-size:15px;font-weight:700;color:#0684b3;white-space:nowrap}
+.board-sched{font-size:15px;font-weight:700;color:#2e97f2;white-space:nowrap}
 .board-card-tagrow{margin-top:8px}
 .board-ava{width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .board-tag{font-size:10.5px;font-weight:600;letter-spacing:0.2px;padding:3px 8px;border-radius:6px}
@@ -189,9 +189,9 @@ textarea{resize:vertical;line-height:1.6}
 .newpill{border:1px solid #d2d2d7;background:#fff;color:#1d1d1f;font-size:14px;font-weight:500;padding:0 16px;border-radius:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
 .typetoggle{display:flex;gap:8px}
 .typetoggle button{flex:1;border:1px solid #d2d2d7;background:#fff;color:#3a3a3c;font-size:14px;font-weight:600;padding:11px 0;border-radius:11px;cursor:pointer;font-family:inherit}
-.typetoggle button.on{background:#05befe;border-color:#05befe;color:#fff}
+.typetoggle button.on{background:#2e97f2;border-color:#2e97f2;color:#fff}
 .sheet-foot{padding:12px 18px calc(18px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e5e5ea}
-.save-job{width:100%;background:#05befe;border:none;color:#fff;font-size:16px;font-weight:600;padding:14px 0;border-radius:13px;cursor:pointer;font-family:inherit}
+.save-job{width:100%;background:#2e97f2;border:none;color:#fff;font-size:16px;font-weight:600;padding:14px 0;border-radius:13px;cursor:pointer;font-family:inherit}
 /* Attachments */
 .att-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px}
 .att{position:relative;width:84px}
@@ -212,7 +212,7 @@ textarea{resize:vertical;line-height:1.6}
 .bj-setdate:active{background:#ececef}
 .navtrio{display:flex;gap:6px;flex-wrap:wrap;width:100%;justify-content:center}
 .navtrio .btn-ghost{padding:7px 13px;font-size:13px}
-.navtrio .btn-ghost.on{background:#05befe;border-color:#05befe;color:#fff}
+.navtrio .btn-ghost.on{background:#2e97f2;border-color:#2e97f2;color:#fff}
 .add-new-sm{border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:13px;font-weight:600;padding:7px 14px;border-radius:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
 .contact-link{color:#2e97f2;font-size:12.5px;font-weight:600;text-decoration:none;white-space:nowrap;cursor:pointer}
 .contact-link.contact-email,.contact-link.contact-address{white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:inline-block;max-width:100%}
@@ -234,7 +234,7 @@ textarea{resize:vertical;line-height:1.6}
 <!-- SIGN-IN GATE -->
 <div id="login-gate" style="display:none;position:fixed;inset:0;z-index:9999;background:#0a0f1e;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box">
   <div style="width:100%;max-width:340px;text-align:center">
-    <div style="color:#05befe;font-size:26px;font-weight:800;letter-spacing:0.02em;margin-bottom:4px">Aspect Power</div>
+    <div style="color:#2e97f2;font-size:26px;font-weight:800;letter-spacing:0.02em;margin-bottom:4px">Aspect Power</div>
     <div style="color:#8a94a6;font-size:13px;margin-bottom:24px">Please sign in to continue</div>
     <input id="login-email" type="email" inputmode="email" autocomplete="username" placeholder="Email"
       style="width:100%;box-sizing:border-box;padding:14px;border-radius:12px;border:1px solid #2a3550;background:#111a2e;color:#fff;font-size:16px;margin-bottom:10px;outline:none"
@@ -243,7 +243,7 @@ textarea{resize:vertical;line-height:1.6}
       style="width:100%;box-sizing:border-box;padding:14px;border-radius:12px;border:1px solid #2a3550;background:#111a2e;color:#fff;font-size:16px;margin-bottom:14px;outline:none"
       onkeydown="if(event.key==='Enter'){submitLogin()}"/>
     <button id="login-btn" onclick="submitLogin()"
-      style="width:100%;padding:14px;border-radius:12px;border:none;background:#05befe;color:#fff;font-size:16px;font-weight:700;cursor:pointer">Sign In</button>
+      style="width:100%;padding:14px;border-radius:12px;border:none;background:#2e97f2;color:#fff;font-size:16px;font-weight:700;cursor:pointer">Sign In</button>
     <div id="login-error" style="color:#ff6b6b;font-size:13px;margin-top:12px;min-height:16px"></div>
   </div>
 </div>
@@ -1237,11 +1237,11 @@ function showMileage(property) {
   if (!property) { refEl.innerHTML = ''; return; }
 
   const miles = lookupMileage(property);
-  const editBtn = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px">edit</button>`;
+  const editBtn = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#2e97f2;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px">edit</button>`;
   if (miles != null) {
     refEl.innerHTML = `⛽ ${miles} mi round trip × $${FUEL_RATE.toFixed(2)} = $${(miles*FUEL_RATE).toFixed(2)} fuel ${editBtn}`;
   } else {
-    refEl.innerHTML = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0">+ Add round-trip mileage for this property</button>`;
+    refEl.innerHTML = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#2e97f2;font-size:12px;text-decoration:underline;cursor:pointer;padding:0">+ Add round-trip mileage for this property</button>`;
   }
 }
 
@@ -1944,9 +1944,9 @@ function showDetail(id) {
   const el = document.getElementById('detail-content');
   const testLinesList = (o.testing||[]).filter(t=>t.service||t.cost).map(t=>`<div class="detail-row"><span class="detail-label">${t.service||'—'}</span><span class="detail-value">$${parseFloat(t.cost||0).toFixed(2)}</span></div>`).join('');
   const matLines = o.materials.filter(m=>m.desc||m.cost).map(m=>`<div class="detail-row"><span class="detail-label">${m.desc||'—'} × ${m.qty||1}</span><span class="detail-value">$${((parseFloat(m.qty)||1)*(parseFloat(m.cost)||0)).toFixed(2)}</span></div>`).join('');
-  const techLines = o.techLabor.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
-  const assistLines = (o.techAssist||[]).filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
-  const labLines = o.laborers.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#05befe':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
+  const techLines = o.techLabor.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#2e97f2':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
+  const assistLines = (o.techAssist||[]).filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#2e97f2':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
+  const labLines = o.laborers.filter(r=>r.rate||r.hours).map(r=>`<div class="detail-row"><span class="detail-label">$${r.rate||0}/hr × ${r.hours||0} hrs</span><span class="detail-value" style="color:${r.type==='RT'?'#2e97f2':'#f59e0b'}">${r.type} · $${((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2)}</span></div>`).join('');
 
   el.innerHTML = `
     <div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${fmtDate(o.date)}</span></div>
@@ -2165,7 +2165,7 @@ function buildHtmlEmail(o) {
 
   const card = (title, content) => `
     <div style="background:#ffffff;border-radius:14px;border:1px solid #e5e7eb;padding:18px 20px;margin-bottom:12px;">
-      <div style="font-size:11px;font-weight:700;color:#05befe;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;">${title}</div>
+      <div style="font-size:11px;font-weight:700;color:#2e97f2;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;">${title}</div>
       ${content}
     </div>`;
 
@@ -2206,7 +2206,7 @@ function buildHtmlEmail(o) {
   // Technical Labor
   let techContent = techRows.map(r => {
     const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
-    const typeColor = r.type==='RT'?'#05befe':'#f59e0b';
+    const typeColor = r.type==='RT'?'#2e97f2':'#f59e0b';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">
       <span style="color:#1d1d1f;font-size:14px;">$${r.rate||0}/hr &times; ${r.hours||0} hrs</span>
       <span style="color:${typeColor};font-size:14px;font-weight:600;">${r.type} &middot; $${sub}</span>
@@ -2217,7 +2217,7 @@ function buildHtmlEmail(o) {
   // Technicians Assistant
   let assistContent = assistRows.map(r => {
     const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
-    const typeColor = r.type==='RT'?'#05befe':'#f59e0b';
+    const typeColor = r.type==='RT'?'#2e97f2':'#f59e0b';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">
       <span style="color:#1d1d1f;font-size:14px;">$${r.rate||0}/hr &times; ${r.hours||0} hrs</span>
       <span style="color:${typeColor};font-size:14px;font-weight:600;">${r.type} &middot; $${sub}</span>
@@ -2228,7 +2228,7 @@ function buildHtmlEmail(o) {
   // Laborer
   let labContent = labRows.map(r => {
     const sub = ((parseFloat(r.rate)||0)*(parseFloat(r.hours)||0)).toFixed(2);
-    const typeColor = r.type==='RT'?'#05befe':'#f59e0b';
+    const typeColor = r.type==='RT'?'#2e97f2':'#f59e0b';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">
       <span style="color:#1d1d1f;font-size:14px;">$${r.rate||0}/hr &times; ${r.hours||0} hrs</span>
       <span style="color:${typeColor};font-size:14px;font-weight:600;">${r.type} &middot; $${sub}</span>
@@ -2248,9 +2248,9 @@ function buildHtmlEmail(o) {
 
   // Total
   const totalSection = `
-    <div style="background:#ffffff;border-radius:14px;border:1.5px solid #05befe;padding:18px 20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 0 0 4px rgba(5,190,254,0.08);">
+    <div style="background:#ffffff;border-radius:14px;border:1.5px solid #2e97f2;padding:18px 20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 0 0 4px rgba(5,190,254,0.08);">
       <span style="color:#86868b;font-size:14px;font-weight:500;">Total</span>
-      <span style="color:#05befe;font-size:28px;font-weight:700;">$${o.total.toFixed(2)}</span>
+      <span style="color:#2e97f2;font-size:28px;font-weight:700;">$${o.total.toFixed(2)}</span>
     </div>`;
 
   return `<!DOCTYPE html>
@@ -2261,7 +2261,7 @@ function buildHtmlEmail(o) {
 
     <!-- Header -->
     <div style="background:#0a0f1e;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:#05befe;font-size:22px;font-weight:700;letter-spacing:0.02em;">Aspect Power</span>
+      <span style="color:#2e97f2;font-size:22px;font-weight:700;letter-spacing:0.02em;">Aspect Power</span>
       <span style="color:#ffffff;font-size:13px;opacity:0.7;">Work Order</span>
     </div>
 
