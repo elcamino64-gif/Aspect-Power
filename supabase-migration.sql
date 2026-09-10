@@ -63,3 +63,85 @@ alter table property_directory enable row level security;
 drop policy if exists property_directory_all on property_directory;
 create policy property_directory_all on property_directory for all using (true) with check (true);
 grant all on property_directory to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- CORE TABLES — Work Orders, Properties, Technicians, Materials, Categories.
+-- These make your WORK ORDERS sync across every device, and make entered data
+-- (customer/property info, prices, materials) persist and sync. Run this file
+-- once. Safe to run more than once; it never deletes your existing data.
+-- ---------------------------------------------------------------------------
+
+-- Work orders (the ones you email to the office)
+create table if not exists work_orders (
+  id             bigint primary key,
+  date           text,
+  by             text,
+  park           text,
+  space_location text,
+  description    text,
+  materials      jsonb default '[]'::jsonb,
+  testing        jsonb default '[]'::jsonb,
+  tech_labor     jsonb default '[]'::jsonb,
+  tech_assist    jsonb default '[]'::jsonb,
+  laborers       jsonb default '[]'::jsonb,
+  fuel_vehicles  text,
+  status         text,
+  other_notes    text,
+  total          numeric,
+  created_at     timestamptz default now()
+);
+-- If work_orders already existed from an earlier version, make sure the newer
+-- columns are present (all safe to run repeatedly).
+alter table work_orders add column if not exists space_location text;
+alter table work_orders add column if not exists testing     jsonb default '[]'::jsonb;
+alter table work_orders add column if not exists tech_assist jsonb default '[]'::jsonb;
+alter table work_orders add column if not exists other_notes text;
+alter table work_orders add column if not exists created_at  timestamptz default now();
+alter table work_orders enable row level security;
+drop policy if exists work_orders_all on work_orders;
+create policy work_orders_all on work_orders for all using (true) with check (true);
+grant all on work_orders to anon, authenticated;
+
+-- Properties (name + office-calculated mileage)
+create table if not exists properties (
+  name    text primary key,
+  mileage numeric
+);
+alter table properties add column if not exists mileage numeric;
+alter table properties enable row level security;
+drop policy if exists properties_all on properties;
+create policy properties_all on properties for all using (true) with check (true);
+grant all on properties to anon, authenticated;
+
+-- Technicians
+create table if not exists technicians (
+  name text primary key
+);
+alter table technicians enable row level security;
+drop policy if exists technicians_all on technicians;
+create policy technicians_all on technicians for all using (true) with check (true);
+grant all on technicians to anon, authenticated;
+
+-- Materials price book — remembers the last price per unit for each material
+create table if not exists materials_db (
+  name         text primary key,
+  cost         text,
+  category     text,
+  manufacturer text
+);
+alter table materials_db add column if not exists manufacturer text;
+alter table materials_db enable row level security;
+drop policy if exists materials_db_all on materials_db;
+create policy materials_db_all on materials_db for all using (true) with check (true);
+grant all on materials_db to anon, authenticated;
+
+-- Material categories
+create table if not exists categories (
+  id   bigint generated always as identity primary key,
+  name text unique not null
+);
+alter table categories enable row level security;
+drop policy if exists categories_all on categories;
+create policy categories_all on categories for all using (true) with check (true);
+grant all on categories to anon, authenticated;
+grant usage, select on all sequences in schema public to anon, authenticated;

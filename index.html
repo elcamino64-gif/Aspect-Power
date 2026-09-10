@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: new-job-tag -->
+<!-- build: order-sync-and-email -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -653,28 +653,25 @@ async function sbFetch(path, options = {}) {
 // Load all cloud data
 async function loadCloudData() {
   try {
-    // Load work orders
+    // Load work orders. Merge cloud with any local-only orders and upload the
+    // ones that were never synced, so every device ends up showing all orders.
     const wo = await sbFetch('work_orders?order=created_at.desc');
-    if (wo && wo.length) {
-      orders = wo.map(o => ({
-        id: o.id,
-        date: o.date,
-        by: o.by,
-        park: o.park,
-        spaceLocation: o.space_location,
-        description: o.description,
-        materials: o.materials || [],
-        testing: o.testing || [],
-        techLabor: o.tech_labor || [],
-        techAssist: o.tech_assist || [],
-        laborers: o.laborers || [],
-        fuelVehicles: o.fuel_vehicles,
-        status: o.status,
-        otherNotes: o.other_notes,
-        total: parseFloat(o.total) || 0
-      }));
-      // Extract properties and techs from work orders as fallback
-      wo.forEach(o => {
+    if (wo !== null) {                       // null means the fetch failed — keep local orders as-is
+      const cloudOrders = wo.map(woRowToOrder);
+      const cloudIds = new Set(cloudOrders.map(o => String(o.id)));
+      cloudOrders.forEach(o => markOrderSynced(o.id));
+      const merged = cloudOrders.slice();
+      orders.forEach(lo => {
+        const idStr = String(lo.id);
+        if (cloudIds.has(idStr)) return;             // cloud copy already present
+        if (syncedOrderIds.has(idStr)) return;       // synced before, now gone from cloud → deleted on another device
+        merged.push(lo);                             // never uploaded → keep it and push it up
+        Promise.resolve(saveOrderToCloud(lo)).catch(() => {});
+      });
+      merged.sort((a,b) => (Number(b.id)||0) - (Number(a.id)||0));
+      orders = merged;
+      // Extract properties and techs from orders as a fallback source
+      orders.forEach(o => {
         if (o.park && !properties.includes(o.park)) properties.push(o.park);
         if (o.by && !technicians.includes(o.by)) technicians.push(o.by);
       });
@@ -726,9 +723,30 @@ async function loadCloudData() {
   }
 }
 
+// Map a work_orders row from the cloud into the app's order shape.
+function woRowToOrder(o) {
+  return {
+    id: o.id,
+    date: o.date,
+    by: o.by,
+    park: o.park,
+    spaceLocation: o.space_location,
+    description: o.description,
+    materials: o.materials || [],
+    testing: o.testing || [],
+    techLabor: o.tech_labor || [],
+    techAssist: o.tech_assist || [],
+    laborers: o.laborers || [],
+    fuelVehicles: o.fuel_vehicles,
+    status: o.status,
+    otherNotes: o.other_notes,
+    total: parseFloat(o.total) || 0
+  };
+}
+
 async function saveOrderToCloud(order) {
   console.log('Saving order to cloud:', order.id);
-  const res = await fetch(SUPABASE_URL + '/rest/v1/work_orders', {
+  const post = (payload) => fetch(SUPABASE_URL + '/rest/v1/work_orders', {
     method: 'POST',
     headers: {
       'apikey': SUPABASE_KEY,
@@ -736,26 +754,38 @@ async function saveOrderToCloud(order) {
       'Content-Type': 'application/json',
       'Prefer': 'resolution=merge-duplicates,return=minimal'
     },
-    body: JSON.stringify({
-      id: order.id,
-      date: order.date,
-      by: order.by,
-      park: order.park,
-      space_location: order.spaceLocation,
-      description: order.description,
-      materials: order.materials,
-      testing: order.testing || [],
-      tech_labor: order.techLabor,
-      tech_assist: order.techAssist,
-      laborers: order.laborers,
-      fuel_vehicles: order.fuelVehicles,
-      status: order.status,
-      other_notes: order.otherNotes,
-      total: order.total
-    })
+    body: JSON.stringify(payload)
   });
-  const txt = await res.text();
-  console.log('saveOrderToCloud response:', res.status, txt);
+  const full = {
+    id: order.id,
+    date: order.date,
+    by: order.by,
+    park: order.park,
+    space_location: order.spaceLocation,
+    description: order.description,
+    materials: order.materials,
+    testing: order.testing || [],
+    tech_labor: order.techLabor,
+    tech_assist: order.techAssist,
+    laborers: order.laborers,
+    fuel_vehicles: order.fuelVehicles,
+    status: order.status,
+    other_notes: order.otherNotes,
+    total: order.total
+  };
+  try {
+    let res = await post(full);
+    if (!res.ok) {
+      // Older table may not have the `testing` column yet — retry without it.
+      const { testing, ...noTesting } = full;
+      console.warn('saveOrderToCloud retry without testing:', res.status, await res.text());
+      res = await post(noTesting);
+    }
+    if (res.ok) markOrderSynced(order.id);
+    else console.warn('saveOrderToCloud failed (saved locally):', res.status, await res.text());
+  } catch (e) {
+    console.error('saveOrderToCloud error (saved locally):', e);
+  }
 }
 
 async function deleteOrderFromCloud(id) {
@@ -943,6 +973,14 @@ function deleteTestingService(name, rowIndex) {
 
 // ── LOAD ──────────────────────────────────────────────────
 try { orders = JSON.parse(localStorage.getItem('workOrders') || '[]'); } catch(e){}
+
+// Which work orders this device has confirmed saved to the cloud. Lets us tell a
+// never-synced local order (upload it) from one that was synced and then deleted
+// on another device (drop it) — so orders sync cleanly across devices.
+let syncedOrderIds = new Set();
+try { syncedOrderIds = new Set((JSON.parse(localStorage.getItem('syncedOrderIds') || '[]')).map(String)); } catch(e){}
+function saveSyncedOrderIds(){ try { localStorage.setItem('syncedOrderIds', JSON.stringify([...syncedOrderIds])); } catch(e){} }
+function markOrderSynced(id){ if (id==null) return; syncedOrderIds.add(String(id)); saveSyncedOrderIds(); }
 
 // ── DATE HELPERS ──────────────────────────────────────────
 function fmtDate(d) {
@@ -2062,9 +2100,9 @@ MATERIALS
 `;
     matRows.forEach(m => {
       const qty = parseFloat(m.qty)||1;
-      const cost = parseFloat(m.cost)||0;
-      const total = qty * cost;
-      body += `${m.desc||'—'}  ×  ${m.qty||1}          $${total.toFixed(2)}\n`;
+      const unit = parseFloat(m.cost)||0;
+      const total = qty * unit;
+      body += `${m.desc||'—'}\n   ${qty} @ $${unit.toFixed(2)}/ea  =  $${total.toFixed(2)}\n`;
     });
     body += `\nMaterials Subtotal         $${matTotal.toFixed(2)}\n\n`;
   }
