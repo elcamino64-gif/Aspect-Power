@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: email-adjacent-icon -->
+<!-- build: file-badges-v2 -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -161,6 +161,8 @@ textarea{resize:vertical;line-height:1.6}
 .drow .v{display:block;color:#1d1d1f;font-weight:500;overflow-wrap:anywhere}
 .att-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
 .att-chip{width:44px;height:44px;border:1px solid #d2d2d7;border-radius:10px;background:#f5f5f7;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;padding:0}
+.att-chip-file{background:var(--fc,#6b7280);border-color:var(--fc,#6b7280);box-shadow:inset 0 -2px 0 rgba(0,0,0,0.12)}
+.att-chip-lbl{font-size:11px;font-weight:800;letter-spacing:0.3px;color:#fff}
 .board-check{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .board-check li{font-size:12.5px;display:flex;align-items:center;gap:9px;color:#3a3a3c;cursor:pointer}
 .board-box{width:17px;height:17px;border:1.5px solid #c4c4ca;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;transition:0.1s}
@@ -198,8 +200,11 @@ textarea{resize:vertical;line-height:1.6}
 .att-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px}
 .att{position:relative;width:84px}
 .att img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid #d2d2d7;cursor:pointer;display:block}
-.att-file{width:100%;display:flex;align-items:center;gap:8px;background:#f5f5f7;border:1px solid #e5e5ea;border-radius:10px;padding:10px 12px}
-.att-name{flex:1;color:#1d1d1f;font-size:13px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.att-file{width:100%;display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e5e5ea;border-radius:12px;padding:9px 11px;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+.att-file-badge{flex-shrink:0;width:44px;height:44px;border-radius:10px;background:var(--fc,#6b7280);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;letter-spacing:0.3px;box-shadow:inset 0 -2px 0 rgba(0,0,0,0.12)}
+.att-file-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.att-name{color:#1d1d1f;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-file-sub{font-size:11px;color:#86868b;font-weight:500}
 .att-cat{margin-bottom:14px}
 .att-cat:last-child{margin-bottom:0}
 .att-cat-label{font-size:11px;font-weight:700;letter-spacing:0.3px;color:#3a3a3c;margin-bottom:7px}
@@ -2765,12 +2770,26 @@ function checklistHtml(o) {
 // ── Attachments (photos / files, stored with the job) ─────
 const ATT_CATS = ['Contract', 'Permit', 'Other'];
 
+// Work out a file's type badge (colored label + document glyph) from its
+// name/MIME so documents read clearly as documents, not photos.
+function fileMeta(a) {
+  const name = a.name || '';
+  const type = a.type || '';
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (type === 'application/pdf' || ext === 'pdf') return { label: 'PDF', color: '#e5484d', kind: 'PDF Document' };
+  if (ext === 'doc' || ext === 'docx' || /word/i.test(type)) return { label: 'DOC', color: '#2e6fe5', kind: 'Word Document' };
+  if (ext === 'xls' || ext === 'xlsx' || /sheet|excel/i.test(type)) return { label: 'XLS', color: '#1f9d55', kind: 'Spreadsheet' };
+  if (ext === 'csv') return { label: 'CSV', color: '#1f9d55', kind: 'Spreadsheet' };
+  if (ext === 'ppt' || ext === 'pptx' || /presentation|powerpoint/i.test(type)) return { label: 'PPT', color: '#e8811a', kind: 'Presentation' };
+  if (ext === 'txt' || ext === 'rtf' || /^text\//i.test(type)) return { label: 'TXT', color: '#8a8a8e', kind: 'Text File' };
+  return { label: ext ? ext.toUpperCase().slice(0, 4) : 'FILE', color: '#8a8a8e', kind: 'Document' };
+}
+
 function renderAtt(o, a) {
   const isImg = a.type && a.type.indexOf('image/') === 0;
-  const icon = (a.type === 'application/pdf' || /\.pdf$/i.test(a.name || '')) ? '📕' : '📄';
-  return isImg
-    ? `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`
-    : `<div class="att att-file"><span class="att-name" onclick="openAttachment(${o.id},${a.id})">${icon} ${escHtml(a.name)}</span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
+  if (isImg) return `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
+  const m = fileMeta(a);
+  return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="openAttachment(${o.id},${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
 }
 
 function attachmentsHtml(o) {
@@ -2813,6 +2832,29 @@ function compressImage(file, maxDim, quality) {
   });
 }
 
+// Turn a File (from a file picker or a paste) into a stored attachment object.
+// Returns null if the file was skipped (too large) or failed.
+async function fileToAttachment(file, category, idBump) {
+  try {
+    let dataUrl, type = file.type || 'application/octet-stream';
+    const isImg = type.indexOf('image/') === 0;
+    if (isImg) {
+      dataUrl = await compressImage(file, 1400, 0.7);
+      type = 'image/jpeg';
+    } else {
+      if (file.size > 4 * 1024 * 1024) { alert('"' + (file.name || 'file') + '" is over 4 MB and was skipped. Please attach a smaller file (or a photo).'); return null; }
+      dataUrl = await readAsDataURL(file);
+    }
+    // Pasted images often arrive with no filename — give them a sensible one.
+    const name = file.name || (isImg ? ('Pasted photo ' + new Date().toLocaleString() + '.jpg') : ('Pasted file ' + new Date().toLocaleString()));
+    return { id: Date.now() + (idBump || 0), name, type, category: category || 'Other', dataUrl };
+  } catch (e) {
+    console.error('attachment failed:', e);
+    alert('Sorry, "' + (file.name || 'that file') + '" could not be attached.');
+    return null;
+  }
+}
+
 async function handleAttachmentPick(ev, id, category) {
   const files = ev.target.files ? Array.from(ev.target.files) : [];
   if (!files.length) return;
@@ -2821,26 +2863,43 @@ async function handleAttachmentPick(ev, id, category) {
   if (!Array.isArray(o.attachments)) o.attachments = [];
   // Process every selected file so several photos can be added at once.
   for (let k = 0; k < files.length; k++) {
-    const file = files[k];
-    try {
-      let dataUrl, type = file.type || 'application/octet-stream';
-      if (type.indexOf('image/') === 0) {
-        dataUrl = await compressImage(file, 1400, 0.7);
-        type = 'image/jpeg';
-      } else {
-        if (file.size > 4 * 1024 * 1024) { alert('"' + file.name + '" is over 4 MB and was skipped. Please attach a smaller file (or a photo).'); continue; }
-        dataUrl = await readAsDataURL(file);
-      }
-      o.attachments.push({ id: Date.now() + k, name: file.name, type, category: category || 'Other', dataUrl });
-    } catch (e) {
-      console.error('attachment failed:', e);
-      alert('Sorry, "' + file.name + '" could not be attached.');
-    }
+    const att = await fileToAttachment(files[k], category, k);
+    if (att) o.attachments.push(att);
   }
   persistBoardJob(o);
   refreshBoardViews();
   ev.target.value = '';
 }
+
+// Paste photos/files with ⌘V (or long-press → Paste on iPhone). Routes the
+// pasted items into whichever attachment area is open: the New Job sheet, or
+// the full job view. Text pastes (no files) are left untouched.
+async function handleGlobalPaste(e) {
+  const cd = e.clipboardData;
+  if (!cd) return;
+  const files = [];
+  if (cd.items) { for (const it of cd.items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } } }
+  if (!files.length && cd.files) { for (const f of cd.files) files.push(f); }
+  if (!files.length) return; // nothing pasteable as an attachment; leave text paste alone
+  const njOverlay = document.getElementById('nj-overlay');
+  const njOpen = njOverlay && njOverlay.classList.contains('show');
+  const bjScreen = document.getElementById('screen-boardjob');
+  const bjActive = bjScreen && bjScreen.classList.contains('active');
+  if (!njOpen && !bjActive) return; // no attachment context open — don't hijack the paste
+  e.preventDefault();
+  if (njOpen) {
+    for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], 'Other', k); if (att) njAttachments.push(att); }
+    njRenderAttachments();
+  } else {
+    const o = boardJobs.find(x => x.id === currentBoardJobId);
+    if (!o) return;
+    if (!Array.isArray(o.attachments)) o.attachments = [];
+    for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], 'Other', k); if (att) o.attachments.push(att); }
+    persistBoardJob(o);
+    refreshBoardViews();
+  }
+}
+document.addEventListener('paste', handleGlobalPaste);
 
 function deleteAttachment(jobId, attId) {
   const o = boardJobs.find(x => x.id === jobId);
@@ -2901,10 +2960,9 @@ function boardDetailHtml(o) {
   if (atts.length) {
     const chips = atts.map(a => {
       const isImg = a.type && a.type.indexOf('image/') === 0;
-      const inner = isImg
-        ? `<img src="${a.dataUrl}" alt="" style="width:100%;height:100%;object-fit:cover"/>`
-        : `<span style="font-size:20px">${a.type && String(a.type).indexOf('pdf') > -1 ? '📄' : '📎'}</span>`;
-      return `<button type="button" class="att-chip" title="${escHtml(a.name||'')}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})">${inner}</button>`;
+      if (isImg) return `<button type="button" class="att-chip" title="${escHtml(a.name||'')}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})"><img src="${a.dataUrl}" alt="" style="width:100%;height:100%;object-fit:cover"/></button>`;
+      const m = fileMeta(a);
+      return `<button type="button" class="att-chip att-chip-file" title="${escHtml(a.name||'')}" style="--fc:${m.color}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})"><span class="att-chip-lbl">${m.label}</span></button>`;
     }).join('');
     h += `<div class="drow"><span class="k">Files</span><span class="v"><div class="att-chips">${chips}</div></span></div>`;
   }
@@ -3250,10 +3308,9 @@ function njRenderAttachments() {
     const items = njAttachments.filter(a => (a.category || 'Other') === cat);
     const grid = items.map(a => {
       const isImg = a.type && a.type.indexOf('image/') === 0;
-      const icon = (a.type === 'application/pdf' || /\.pdf$/i.test(a.name || '')) ? '📕' : '📄';
-      return isImg
-        ? `<div class="att"><img src="${a.dataUrl}" onclick="njOpenAttachment(${a.id})"/><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`
-        : `<div class="att att-file"><span class="att-name" onclick="njOpenAttachment(${a.id})">${icon} ${escHtml(a.name)}</span><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
+      if (isImg) return `<div class="att"><img src="${a.dataUrl}" onclick="njOpenAttachment(${a.id})"/><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
+      const m = fileMeta(a);
+      return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="njOpenAttachment(${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
     }).join('');
     return `<div class="att-cat"><div class="att-cat-label">${cat}</div>${items.length?`<div class="att-grid">${grid}</div>`:''}<label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" multiple style="display:none" onchange="njHandleAttachmentPick(event,'${cat}')"/>📎 Add ${cat}</label></div>`;
   }).join('');
@@ -3263,13 +3320,8 @@ async function njHandleAttachmentPick(ev, category) {
   if (!files.length) return;
   // Process every selected file so several photos can be added at once.
   for (let k = 0; k < files.length; k++) {
-    const file = files[k];
-    try {
-      let dataUrl, type = file.type || 'application/octet-stream';
-      if (type.indexOf('image/') === 0) { dataUrl = await compressImage(file, 1400, 0.7); type = 'image/jpeg'; }
-      else { if (file.size > 4 * 1024 * 1024) { alert('"' + file.name + '" is over 4 MB and was skipped.'); continue; } dataUrl = await readAsDataURL(file); }
-      njAttachments.push({ id: Date.now() + k, name: file.name, type, category: category || 'Other', dataUrl });
-    } catch (e) { console.error('nj attachment failed:', e); alert('Sorry, "' + file.name + '" could not be attached.'); }
+    const att = await fileToAttachment(files[k], category, k);
+    if (att) njAttachments.push(att);
   }
   njRenderAttachments();
   ev.target.value = '';
