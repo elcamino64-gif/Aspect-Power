@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: unified-accent -->
+<!-- build: view-edit-modes -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -207,6 +207,13 @@ textarea{resize:vertical;line-height:1.6}
 .bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
 .bj-title{font-size:22px;font-weight:800;color:#1d1d1f;margin:0 2px 12px;line-height:1.15}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
+/* Clean read-only grouping (view mode) */
+.bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
+.bj-row{padding:12px 0;border-bottom:1px solid #f0f0f2}
+.bj-row:last-child{border-bottom:none}
+.bj-row .l{font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#86868b;margin-bottom:3px}
+.bj-row .v{font-size:15px;color:#1d1d1f;font-weight:500;overflow-wrap:anywhere;line-height:1.4}
+.bj-row .v.muted{color:#86868b;font-weight:400}
 /* Shown instead of an empty date field so no confusing grey date appears */
 .bj-setdate{display:block;width:100%;text-align:left;background:#f5f5f7;border:1px dashed #c7c7cc;color:#3a3a3c;font-size:15px;font-weight:500;padding:12px 14px;border-radius:12px;cursor:pointer;font-family:inherit}
 .bj-setdate:active{background:#ececef}
@@ -2979,74 +2986,94 @@ function boardFitAll() {
 }
 
 // ── Full-screen board job detail ──────────────────────────
+let boardJobEditMode = false;
 function showBoardJob(id) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   currentBoardJobId = id;
+  boardJobEditMode = false; // always open locked/read-only
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-boardjob').classList.add('active');
+  renderBoardJob(id);
+}
+function editBoardJob(id){ boardJobEditMode = true; renderBoardJob(id); }
+function doneEditBoardJob(id){ boardJobEditMode = false; renderBoardJob(id); }
+
+function renderBoardJob(id) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
   const badge = document.getElementById('boardjob-status-badge');
   badge.textContent = normalizeStage(o.status);
   badge.className = 'status-badge';
   badge.style.color = stageColor(o.status);
   badge.style.background = stageColor(o.status) + '18';
-  const amt = parseFloat(o.total) || 0;
-  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
-  const techList = technicians.slice();
-  if (o.by && !techList.includes(o.by)) techList.unshift(o.by);
-  const techOpts = techList.map(t => `<option value="${escHtml(t)}"${t===o.by?' selected':''}>${escHtml(t)}</option>`).join('');
-  const parkList = properties.slice();
-  if (o.park && !parkList.includes(o.park)) parkList.unshift(o.park);
-  const parkOpts = '<option value="">Select property...</option>' +
-    parkList.map(pn => `<option value="${escHtml(pn)}"${pn===o.park?' selected':''}>${escHtml(pn)}</option>`).join('');
+
   const jobAddr = formatAddress(propertyInfo[o.park]);
   const hasContact = o.contact || o.contactPhone || o.contactEmail;
+  const addrHtml = jobAddr
+    ? `<a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(jobAddr)}">📍 ${escHtml(jobAddr)}</a>`
+    : '—';
+  const contactHtml = hasContact
+    ? `${escHtml(o.contact||'')}${o.contactTitle?` <span style="color:#86868b;font-weight:400">(${escHtml(o.contactTitle)})</span>`:''}`
+      + `${o.contactPhone?`<br><a class="contact-link" href="tel:${escHtml(o.contactPhone)}">📞 ${escHtml(o.contactPhone)}</a>`:''}`
+      + `${o.contactEmail?`<br><a class="contact-link contact-email" href="mailto:${escHtml(o.contactEmail)}">✉️ ${escHtml(o.contactEmail)}</a>`:''}`
+    : '—';
+
+  let top;
+  if (boardJobEditMode) {
+    const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
+    const techList = technicians.slice();
+    if (o.by && !techList.includes(o.by)) techList.unshift(o.by);
+    const techOpts = techList.map(t => `<option value="${escHtml(t)}"${t===o.by?' selected':''}>${escHtml(t)}</option>`).join('');
+    top = `
+      <label class="fl">Scheduled For</label>
+      ${o.scheduledDate
+        ? `<div style="display:flex;gap:8px;align-items:center">
+             <input type="date" value="${escHtml(o.scheduledDate)}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); if(!this.value) renderBoardJob(${o.id})" style="flex:1"/>
+             <button type="button" class="btn-ghost" style="flex-shrink:0;padding:10px 12px" onclick="editBoardJobField(${o.id},'scheduledDate',''); renderBoardJob(${o.id})">Clear</button>
+           </div>`
+        : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`}
+      <label class="fl">Stage</label>
+      <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
+      <label class="fl">Added By</label>
+      <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
+      <label class="fl">Job Location</label>
+      <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
+      <label class="fl">Description</label>
+      <textarea rows="3" placeholder="Describe the scope..." onchange="editBoardJobField(${o.id},'description',this.value)">${escHtml(o.description||'')}</textarea>
+      <label class="fl">Status Tag</label>
+      <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
+      <div class="bj-sep"></div>
+      <label class="fl">Property Address</label>
+      <div class="bj-static"${jobAddr?'':' style="color:#86868b;font-weight:400"'}>${jobAddr?addrHtml:'No address on file yet.'}</div>
+      <label class="fl">Contact</label>
+      <div class="bj-static"${hasContact?'':' style="color:#86868b;font-weight:400"'}>${hasContact?contactHtml:'No contact on file yet.'}</div>
+      <div style="font-size:11px;color:#86868b;margin:8px 2px 0">Address &amp; contact are managed on the Contacts screen.</div>
+      <button class="btn-primary" style="margin-top:22px" onclick="doneEditBoardJob(${o.id})">✓ Done</button>`;
+  } else {
+    const row = (l, v, muted) => `<div class="bj-row"><div class="l">${l}</div><div class="v${muted?' muted':''}">${v}</div></div>`;
+    top = `
+      <div class="bj-group">
+        ${row('Scheduled', o.scheduledDate ? fmtDate(o.scheduledDate) : 'Not scheduled', !o.scheduledDate)}
+        ${row('Stage', escHtml(normalizeStage(o.status)))}
+        ${row('Added By', escHtml(o.by||'—'), !o.by)}
+        ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
+        ${o.description ? row('Description', escHtml(o.description)) : ''}
+        ${o.statusTag ? row('Status', escHtml(o.statusTag)) : ''}
+        ${row('Property Address', addrHtml, !jobAddr)}
+        ${row('Contact', contactHtml, !hasContact)}
+      </div>
+      <button class="btn-primary" onclick="editBoardJob(${o.id})">✏️ Edit details</button>`;
+  }
+
   document.getElementById('boardjob-content').innerHTML = `
     <div class="bj-title">${escHtml(o.park||'—')}</div>
-
-    <label class="fl">Scheduled For</label>
-    ${o.scheduledDate
-      ? `<div style="display:flex;gap:8px;align-items:center">
-           <input type="date" value="${escHtml(o.scheduledDate)}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); if(!this.value) showBoardJob(${o.id})" style="flex:1"/>
-           <button type="button" class="btn-ghost" style="flex-shrink:0;padding:10px 12px" onclick="editBoardJobField(${o.id},'scheduledDate',''); showBoardJob(${o.id})">Clear</button>
-         </div>`
-      : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`}
-    <label class="fl">Stage</label>
-    <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
-    <label class="fl">Added By</label>
-    <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
-    <label class="fl">Job Location</label>
-    <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
-    <label class="fl">Description</label>
-    <textarea rows="3" placeholder="Describe the scope..." onchange="editBoardJobField(${o.id},'description',this.value)">${escHtml(o.description||'')}</textarea>
-    <label class="fl">Status Tag</label>
-    <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
-
-    <div class="bj-sep"></div>
-
-    <label class="fl">Property Address</label>
-    ${jobAddr
-      ? `<div class="bj-static"><a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(jobAddr)}">📍 ${escHtml(jobAddr)}</a></div>`
-      : `<div class="bj-static" style="color:#86868b;font-weight:400">No address on file yet.</div>`}
-
-    <label class="fl">Contact</label>
-    ${hasContact ? `
-      <div class="bj-static">${escHtml(o.contact||'')}${o.contactTitle?` <span style="color:#86868b;font-weight:400">(${escHtml(o.contactTitle)})</span>`:''}</div>
-      ${o.contactPhone?`<div style="padding:2px 2px 0"><a class="contact-link" href="tel:${escHtml(o.contactPhone)}">📞 ${escHtml(o.contactPhone)}</a></div>`:''}
-      ${o.contactEmail?`<div style="padding:4px 2px 0"><a class="contact-link contact-email" href="mailto:${escHtml(o.contactEmail)}">✉️ ${escHtml(o.contactEmail)}</a></div>`:''}
-    ` : `<div class="bj-static" style="color:#86868b;font-weight:400">No contact on file yet.</div>`}
-    <div style="font-size:11px;color:#86868b;margin:8px 2px 0">Address &amp; contact are managed on the Contacts screen.</div>
-
-    <div class="bj-sep"></div>
-
-    <label class="fl">Attachments</label>
+    ${top}
+    <label class="fl" style="margin-top:22px">Attachments</label>
     ${attachmentsHtml(o)}
-
     <label class="fl">Checklist</label>
     ${checklistHtml(o)}
-
-    <button class="btn-primary" style="margin-top:22px" onclick="saveBoardJobDone(${o.id})">Save</button>
-    <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:10px" onclick="removeBoardJob(${o.id})">Remove job</button>
+    <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
 }
@@ -3074,7 +3101,7 @@ function revealScheduleInput(id) {
   const inp = document.createElement('input');
   inp.type = 'date';
   inp.style.width = '100%';
-  inp.onchange = () => { editBoardJobField(id, 'scheduledDate', inp.value); showBoardJob(id); };
+  inp.onchange = () => { editBoardJobField(id, 'scheduledDate', inp.value); renderBoardJob(id); };
   btn.replaceWith(inp);
   inp.focus();
   if (inp.showPicker) { try { inp.showPicker(); } catch(e){} }
@@ -3098,7 +3125,7 @@ function refreshBoardViews() {
   const b = document.getElementById('screen-board');
   const d = document.getElementById('screen-boardjob');
   if (b && b.classList.contains('active')) renderBoard();
-  if (d && d.classList.contains('active') && currentBoardJobId != null) showBoardJob(currentBoardJobId);
+  if (d && d.classList.contains('active') && currentBoardJobId != null) renderBoardJob(currentBoardJobId);
 }
 
 let permitJobId = null;
@@ -3327,7 +3354,10 @@ function renderContacts() {
     <div style="height:32px"></div>`;
   renderContactsDetail();
 }
-function selectContactProperty(name){ contactsSelected = name; renderContactsDetail(); }
+let contactsEditMode = false;
+function selectContactProperty(name){ contactsSelected = name; contactsEditMode = false; renderContactsDetail(); }
+function editContacts(){ contactsEditMode = true; renderContactsDetail(); }
+function doneEditContacts(){ saveContactsProperty(); contactsEditMode = false; renderContactsDetail(); }
 function renderContactsDetail() {
   const el = document.getElementById('contacts-detail');
   if (!el) return;
@@ -3335,6 +3365,25 @@ function renderContactsDetail() {
   const pi = contactNames.indexOf(n);
   const info = propertyInfo[n] || { address:'', contacts:[] };
   const contacts = Array.isArray(info.contacts) ? info.contacts : [];
+
+  // Read-only view (default): clean, grouped, locked in.
+  if (!contactsEditMode) {
+    const addr = formatAddress(info);
+    const row = (l, v, muted) => `<div class="bj-row"><div class="l">${l}</div><div class="v${muted?' muted':''}">${v}</div></div>`;
+    const contactRows = contacts.length
+      ? contacts.map(c => `<div class="bj-row"><div class="l">${escHtml(c.title||'Contact')}</div><div class="v">${escHtml(c.name||'—')}`
+          + `${c.phone?`<br><a class="contact-link" href="tel:${escHtml(c.phone)}">📞 ${escHtml(c.phone)}</a>`:''}`
+          + `${c.email?`<br><a class="contact-link contact-email" href="mailto:${escHtml(c.email)}">✉️ ${escHtml(c.email)}</a>`:''}</div></div>`).join('')
+      : `<div class="bj-row"><div class="v muted">No contacts yet</div></div>`;
+    el.innerHTML = `<div class="bj-group" style="margin-top:14px">
+      ${row('Address', addr ? `<a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}">📍 ${escHtml(addr)}</a>` : '—', !addr)}
+      ${contactRows}
+    </div>
+    <button class="btn-primary" onclick="editContacts()">✏️ Edit property &amp; contacts</button>`;
+    return;
+  }
+
+  // Edit mode
   const contactBlocks = contacts.map((c, ci) => `
     <div class="contact-block">
       <div class="contact-block-head">
@@ -3373,7 +3422,7 @@ function renderContactsDetail() {
     </div>
     ${contactBlocks || '<div class="att-empty" style="margin-top:10px">No contacts yet</div>'}
     <button class="att-add" style="margin-top:10px" onclick="addContact(${pi})">＋ Add contact</button>
-    <button class="btn-primary" id="cd-save" style="margin-top:16px" onclick="saveContactsProperty()">Save</button>
+    <button class="btn-primary" id="cd-save" style="margin-top:16px" onclick="doneEditContacts()">✓ Done</button>
   </div>`;
 }
 function saveContactsProperty(){
