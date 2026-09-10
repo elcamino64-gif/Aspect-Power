@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fullview-readonly-cleanup -->
+<!-- build: fullview-clean-v2 -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -205,6 +205,8 @@ textarea{resize:vertical;line-height:1.6}
 .att-file-icon{font-size:26px;line-height:1}
 .att-file-name{font-size:9px;color:#3a3a3c;text-align:center;line-height:1.15;max-height:22px;overflow:hidden;width:100%;word-break:break-word}
 .bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
+.bj-title{font-size:22px;font-weight:800;color:#1d1d1f;margin:0 2px 12px;line-height:1.15}
+.bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 .navtrio{display:flex;gap:6px;flex-wrap:wrap;width:100%;justify-content:center}
 .navtrio .btn-ghost{padding:7px 13px;font-size:13px}
 .navtrio .btn-ghost.on{background:#05befe;border-color:#05befe;color:#fff}
@@ -2996,15 +2998,14 @@ function showBoardJob(id) {
   const jobAddr = formatAddress(propertyInfo[o.park]);
   const hasContact = o.contact || o.contactPhone || o.contactEmail;
   document.getElementById('boardjob-content').innerHTML = `
-    ${o.date?`<label class="fl" style="margin-top:0">Added</label><div class="bj-static">${fmtDate(o.date)}</div>`:''}
+    <div class="bj-title">${escHtml(o.park||'—')}</div>
+
     <label class="fl">Scheduled For</label>
     <input type="date" value="${escHtml(o.scheduledDate||'')}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value)"/>
     <label class="fl">Stage</label>
     <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
     <label class="fl">Added By</label>
     <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
-    <label class="fl">Park / Property</label>
-    <select onchange="editBoardJobField(${o.id},'park',this.value)">${parkOpts}</select>
     <label class="fl">Job Location</label>
     <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
     <label class="fl">Description</label>
@@ -3012,26 +3013,30 @@ function showBoardJob(id) {
     <label class="fl">Status Tag</label>
     <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
 
-    <div class="detail-card" style="margin-top:18px">
-      <div class="detail-card-title">Property Address</div>
-      ${jobAddr
-        ? `<a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(jobAddr)}">📍 ${escHtml(jobAddr)}</a>`
-        : `<div style="color:#86868b;font-size:13px">No address on file yet.</div>`}
-    </div>
+    <div class="bj-sep"></div>
 
-    <div class="detail-card">
-      <div class="detail-card-title">Contact</div>
-      ${hasContact ? `
-        <div style="font-size:14px;color:#1d1d1f;font-weight:500">${escHtml(o.contact||'')}${o.contactTitle?` <span style="color:#86868b;font-weight:400">(${escHtml(o.contactTitle)})</span>`:''}</div>
-        ${o.contactPhone?`<div style="margin-top:6px"><a class="contact-link" href="tel:${escHtml(o.contactPhone)}">📞 ${escHtml(o.contactPhone)}</a></div>`:''}
-        ${o.contactEmail?`<div style="margin-top:6px"><a class="contact-link contact-email" href="mailto:${escHtml(o.contactEmail)}">✉️ ${escHtml(o.contactEmail)}</a></div>`:''}
-      ` : `<div style="color:#86868b;font-size:13px">No contact on file yet.</div>`}
-      <div style="font-size:11px;color:#86868b;margin-top:10px">Address &amp; contact are managed on the Contacts screen.</div>
-    </div>
+    <label class="fl">Property Address</label>
+    ${jobAddr
+      ? `<div class="bj-static"><a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(jobAddr)}">📍 ${escHtml(jobAddr)}</a></div>`
+      : `<div class="bj-static" style="color:#86868b;font-weight:400">No address on file yet.</div>`}
 
-    <div class="detail-card"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
-    <div class="detail-card"><div class="detail-card-title">Checklist</div>${checklistHtml(o)}</div>
-    <button class="btn-primary" style="margin-top:20px" onclick="saveBoardJobDone(${o.id})">Save</button>
+    <label class="fl">Contact</label>
+    ${hasContact ? `
+      <div class="bj-static">${escHtml(o.contact||'')}${o.contactTitle?` <span style="color:#86868b;font-weight:400">(${escHtml(o.contactTitle)})</span>`:''}</div>
+      ${o.contactPhone?`<div style="padding:2px 2px 0"><a class="contact-link" href="tel:${escHtml(o.contactPhone)}">📞 ${escHtml(o.contactPhone)}</a></div>`:''}
+      ${o.contactEmail?`<div style="padding:4px 2px 0"><a class="contact-link contact-email" href="mailto:${escHtml(o.contactEmail)}">✉️ ${escHtml(o.contactEmail)}</a></div>`:''}
+    ` : `<div class="bj-static" style="color:#86868b;font-weight:400">No contact on file yet.</div>`}
+    <div style="font-size:11px;color:#86868b;margin:8px 2px 0">Address &amp; contact are managed on the Contacts screen.</div>
+
+    <div class="bj-sep"></div>
+
+    <label class="fl">Attachments</label>
+    ${attachmentsHtml(o)}
+
+    <label class="fl">Checklist</label>
+    ${checklistHtml(o)}
+
+    <button class="btn-primary" style="margin-top:22px" onclick="saveBoardJobDone(${o.id})">Save</button>
     <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:10px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
