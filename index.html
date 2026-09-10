@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: view-edit-modes -->
+<!-- build: attachment-icons -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -156,9 +156,11 @@ textarea{resize:vertical;line-height:1.6}
 .board-empty{font-size:13px;color:#86868b;font-style:italic;padding:4px 2px}
 .board-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px solid #e5e5ea}
 .board-card.open .board-detail{display:block}
-.drow{display:flex;gap:10px;font-size:12.5px;margin-bottom:8px;line-height:1.35}
-.drow .k{color:#86868b;min-width:62px;flex-shrink:0;text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:0.4px;padding-top:1px}
-.drow .v{color:#1d1d1f;font-weight:500;flex:1;min-width:0;overflow-wrap:anywhere}
+.drow{display:block;font-size:13px;margin-bottom:11px;line-height:1.4}
+.drow .k{display:block;color:#86868b;text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:2px}
+.drow .v{display:block;color:#1d1d1f;font-weight:500;overflow-wrap:anywhere}
+.att-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.att-chip{width:44px;height:44px;border:1px solid #d2d2d7;border-radius:10px;background:#f5f5f7;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;padding:0}
 .board-check{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .board-check li{font-size:12.5px;display:flex;align-items:center;gap:9px;color:#3a3a3c;cursor:pointer}
 .board-box{width:17px;height:17px;border:1.5px solid #c4c4ca;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;transition:0.1s}
@@ -2895,9 +2897,17 @@ function boardDetailHtml(o) {
     h += `<div class="drow"><span class="k">Contact</span><span class="v">${v}</span></div>`;
   }
   if (o.otherNotes) h += `<div class="drow"><span class="k">Notes</span><span class="v">${escHtml(o.otherNotes)}</span></div>`;
-  const nAtt = Array.isArray(o.attachments) ? o.attachments.length : 0;
-  if (nAtt) h += `<div class="drow"><span class="k">Files</span><span class="v">📎 ${nAtt} attachment${nAtt!==1?'s':''}</span></div>`;
-  h += `<div class="drow"><span class="k">Checklist</span></div>${checklistHtml(o)}`;
+  const atts = Array.isArray(o.attachments) ? o.attachments : [];
+  if (atts.length) {
+    const chips = atts.map(a => {
+      const isImg = a.type && a.type.indexOf('image/') === 0;
+      const inner = isImg
+        ? `<img src="${a.dataUrl}" alt="" style="width:100%;height:100%;object-fit:cover"/>`
+        : `<span style="font-size:20px">${a.type && String(a.type).indexOf('pdf') > -1 ? '📄' : '📎'}</span>`;
+      return `<button type="button" class="att-chip" title="${escHtml(a.name||'')}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})">${inner}</button>`;
+    }).join('');
+    h += `<div class="drow"><span class="k">Files</span><span class="v"><div class="att-chips">${chips}</div></span></div>`;
+  }
   const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
   h += `<div class="move-row"><span class="k">Stage</span><select class="move-sel" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select></div>`;
   h += `<div class="board-actions">
@@ -3052,9 +3062,16 @@ function renderBoardJob(id) {
       <button class="btn-primary" style="margin-top:22px" onclick="doneEditBoardJob(${o.id})">✓ Done</button>`;
   } else {
     const row = (l, v, muted) => `<div class="bj-row"><div class="l">${l}</div><div class="v${muted?' muted':''}">${v}</div></div>`;
+    // Scheduling is available right here, without tapping Edit.
+    const schedControl = o.scheduledDate
+      ? `<div style="display:flex;gap:8px;align-items:center;margin-top:2px">
+           <input type="date" value="${escHtml(o.scheduledDate)}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); if(!this.value) renderBoardJob(${o.id})" style="flex:1"/>
+           <button type="button" class="btn-ghost" style="flex-shrink:0;padding:8px 10px" onclick="editBoardJobField(${o.id},'scheduledDate',''); renderBoardJob(${o.id})">Clear</button>
+         </div>`
+      : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`;
     top = `
       <div class="bj-group">
-        ${row('Scheduled', o.scheduledDate ? fmtDate(o.scheduledDate) : 'Not scheduled', !o.scheduledDate)}
+        <div class="bj-row"><div class="l">Scheduled</div><div class="v">${schedControl}</div></div>
         ${row('Stage', escHtml(normalizeStage(o.status)))}
         ${row('Added By', escHtml(o.by||'—'), !o.by)}
         ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
@@ -3071,8 +3088,6 @@ function renderBoardJob(id) {
     ${top}
     <label class="fl" style="margin-top:22px">Attachments</label>
     ${attachmentsHtml(o)}
-    <label class="fl">Checklist</label>
-    ${checklistHtml(o)}
     <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
