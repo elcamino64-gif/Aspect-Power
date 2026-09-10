@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: address-wrap-fix -->
+<!-- build: fullview-readonly-cleanup -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2872,8 +2872,8 @@ function closeLightbox() { document.getElementById('att-lightbox').classList.rem
 function boardDetailHtml(o) {
   let h = '<div class="board-detail">';
   const addr = formatAddress(propertyInfo[o.park]);
-  if (addr) h += `<div class="drow"><span class="k">Address</span><span class="v"><a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" onclick="event.stopPropagation()">📍 ${escHtml(addr)}</a></span></div>`;
-  if (o.spaceLocation) h += `<div class="drow"><span class="k">Location</span><span class="v">${escHtml(o.spaceLocation)}</span></div>`;
+  if (addr) h += `<div class="drow"><span class="k">Property Address</span><span class="v"><a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" onclick="event.stopPropagation()">📍 ${escHtml(addr)}</a></span></div>`;
+  if (o.spaceLocation) h += `<div class="drow"><span class="k">Job Location</span><span class="v">${escHtml(o.spaceLocation)}</span></div>`;
   if (o.contact || o.contactPhone || o.contactEmail) {
     let v = escHtml(o.contact || '');
     if (o.contactTitle) v += ` <span style="color:#86868b">(${escHtml(o.contactTitle)})</span>`;
@@ -2993,42 +2993,44 @@ function showBoardJob(id) {
   if (o.park && !parkList.includes(o.park)) parkList.unshift(o.park);
   const parkOpts = '<option value="">Select property...</option>' +
     parkList.map(pn => `<option value="${escHtml(pn)}"${pn===o.park?' selected':''}>${escHtml(pn)}</option>`).join('');
-  const amtVal = amt > 0 ? '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
+  const jobAddr = formatAddress(propertyInfo[o.park]);
+  const hasContact = o.contact || o.contactPhone || o.contactEmail;
   document.getElementById('boardjob-content').innerHTML = `
     ${o.date?`<label class="fl" style="margin-top:0">Added</label><div class="bj-static">${fmtDate(o.date)}</div>`:''}
     <label class="fl">Scheduled For</label>
     <input type="date" value="${escHtml(o.scheduledDate||'')}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value)"/>
+    <label class="fl">Stage</label>
+    <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
     <label class="fl">Added By</label>
     <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
     <label class="fl">Park / Property</label>
     <select onchange="editBoardJobField(${o.id},'park',this.value)">${parkOpts}</select>
-    <label class="fl">Property Address</label>
-    <input type="text" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].address)||'')}" placeholder="Street address" onchange="setJobPropField(${o.id},'address',this.value)"/>
-    <div style="display:flex;gap:8px">
-      <div style="flex:2"><label class="fl">City</label><input type="text" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].city)||'')}" placeholder="City" onchange="setJobPropField(${o.id},'city',this.value)"/></div>
-      <div style="flex:1"><label class="fl">State</label><input type="text" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].state)||'')}" placeholder="State" onchange="setJobPropField(${o.id},'state',this.value)"/></div>
-      <div style="flex:1"><label class="fl">Zip</label><input type="text" inputmode="numeric" value="${escHtml((propertyInfo[o.park]&&propertyInfo[o.park].zip)||'')}" placeholder="Zip" onchange="setJobPropField(${o.id},'zip',this.value)"/></div>
-    </div>
-    <div style="font-size:11px;color:#86868b;margin-top:4px">Address is saved for this property and used on all its jobs.</div>
-    <label class="fl">Space / Location</label>
-    <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, address, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
+    <label class="fl">Job Location</label>
+    <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
     <label class="fl">Description</label>
     <textarea rows="3" placeholder="Describe the scope..." onchange="editBoardJobField(${o.id},'description',this.value)">${escHtml(o.description||'')}</textarea>
     <label class="fl">Status Tag</label>
     <input type="text" value="${escHtml(o.statusTag||'')}" placeholder="e.g. PG&amp;E hold" onchange="editBoardJobField(${o.id},'statusTag',this.value)"/>
-    <label class="fl">Contact Name</label>
-    <input type="text" value="${escHtml(o.contact||'')}" placeholder="Name" onchange="editBoardJobField(${o.id},'contact',this.value)"/>
-    <label class="fl">Contact Title</label>
-    <input type="text" list="title-options" value="${escHtml(o.contactTitle||'')}" placeholder="e.g. Manager" onchange="editBoardJobField(${o.id},'contactTitle',this.value)"/>
-    <label class="fl">Contact Phone</label>
-    <input type="tel" inputmode="tel" value="${escHtml(o.contactPhone||'')}" placeholder="Phone number" onchange="editBoardJobField(${o.id},'contactPhone',this.value)"/>
-    <label class="fl">Contact Email</label>
-    <input type="email" inputmode="email" value="${escHtml(o.contactEmail||'')}" placeholder="Email" onchange="editBoardJobField(${o.id},'contactEmail',this.value)"/>
-    <div class="detail-card" style="margin-top:18px"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
-    <div class="detail-card"><div class="detail-card-title">Checklist</div>${checklistHtml(o)}</div>
-    <div class="detail-card"><div class="detail-card-title">Stage</div>
-      <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
+
+    <div class="detail-card" style="margin-top:18px">
+      <div class="detail-card-title">Property Address</div>
+      ${jobAddr
+        ? `<a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(jobAddr)}">📍 ${escHtml(jobAddr)}</a>`
+        : `<div style="color:#86868b;font-size:13px">No address on file yet.</div>`}
     </div>
+
+    <div class="detail-card">
+      <div class="detail-card-title">Contact</div>
+      ${hasContact ? `
+        <div style="font-size:14px;color:#1d1d1f;font-weight:500">${escHtml(o.contact||'')}${o.contactTitle?` <span style="color:#86868b;font-weight:400">(${escHtml(o.contactTitle)})</span>`:''}</div>
+        ${o.contactPhone?`<div style="margin-top:6px"><a class="contact-link" href="tel:${escHtml(o.contactPhone)}">📞 ${escHtml(o.contactPhone)}</a></div>`:''}
+        ${o.contactEmail?`<div style="margin-top:6px"><a class="contact-link contact-email" href="mailto:${escHtml(o.contactEmail)}">✉️ ${escHtml(o.contactEmail)}</a></div>`:''}
+      ` : `<div style="color:#86868b;font-size:13px">No contact on file yet.</div>`}
+      <div style="font-size:11px;color:#86868b;margin-top:10px">Address &amp; contact are managed on the Contacts screen.</div>
+    </div>
+
+    <div class="detail-card"><div class="detail-card-title">Attachments</div>${attachmentsHtml(o)}</div>
+    <div class="detail-card"><div class="detail-card-title">Checklist</div>${checklistHtml(o)}</div>
     <button class="btn-primary" style="margin-top:20px" onclick="saveBoardJobDone(${o.id})">Save</button>
     <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:10px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
