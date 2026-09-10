@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: scheduled-date-sort -->
+<!-- build: card-sched-larger -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -148,6 +148,8 @@ textarea{resize:vertical;line-height:1.6}
 .board-card-park{font-size:15px;font-weight:600;line-height:1.2;color:#1d1d1f}
 .board-card-scope{font-size:13px;color:#3a3a3c;line-height:1.4}
 .board-card-meta{display:flex;align-items:center;gap:9px;margin-top:11px;flex-wrap:wrap}
+.board-sched{font-size:15px;font-weight:700;color:#0684b3;white-space:nowrap}
+.board-card-tagrow{margin-top:8px}
 .board-ava{width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .board-tag{font-size:10.5px;font-weight:600;letter-spacing:0.2px;padding:3px 8px;border-radius:6px}
 .board-card-amt{margin-left:auto;font-size:14px;font-weight:700;color:#1d1d1f}
@@ -2730,9 +2732,9 @@ function boardCardHtml(o) {
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
     <div class="board-card-meta">
       <span class="board-ava" style="background:${av.color}">${av.initials}</span>
-      ${o.scheduledDate?`<span class="board-tag" style="background:#05befe1e;color:#0684b3">📅 ${fmtDate(o.scheduledDate)}</span>`:''}
-      ${tagHtml}
+      ${o.scheduledDate?`<span class="board-sched">📅 ${fmtDate(o.scheduledDate)}</span>`:''}
     </div>
+    ${tagHtml?`<div class="board-card-tagrow">${tagHtml}</div>`:''}
     ${boardDetailHtml(o)}
   </div>`;
 }
