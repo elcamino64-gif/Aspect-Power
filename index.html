@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: file-badges-v2 -->
+<!-- build: attach-dropdown -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -236,6 +236,8 @@ textarea{resize:vertical;line-height:1.6}
 .att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
 .att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
+.att-adder{margin-top:10px}
+.att-add-select{-webkit-appearance:none;appearance:none;display:inline-block;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:11px 34px 11px 16px;border-radius:12px;cursor:pointer;font-family:inherit;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%232e97f2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 14px center}
 .att-empty{font-size:12.5px;color:#c7c7cc;font-style:italic}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
 .lightbox.show{display:flex}
@@ -2768,7 +2770,10 @@ function checklistHtml(o) {
 }
 
 // ── Attachments (photos / files, stored with the job) ─────
-const ATT_CATS = ['Contract', 'Permit', 'Other'];
+const ATT_CATS = ['Contract', 'Permit', 'Pictures', 'Other'];
+const ATT_ACCEPT_ALL = 'image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.csv';
+// File types offered when adding to a specific category (Pictures = photos only).
+function attAcceptFor(cat) { return cat === 'Pictures' ? 'image/*' : ATT_ACCEPT_ALL; }
 
 // Work out a file's type badge (colored label + document glyph) from its
 // name/MIME so documents read clearly as documents, not photos.
@@ -2792,16 +2797,25 @@ function renderAtt(o, a) {
   return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="openAttachment(${o.id},${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span><button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button></div>`;
 }
 
+// The single "Add attachment" dropdown (choose a category, then pick files).
+function attAdderHtml(id, onchange, inputId, inputOnchange) {
+  const opts = ATT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+  return `<div class="att-adder">
+      <select class="att-add-select" onchange="${onchange}"><option value="">📎 Add attachment…</option>${opts}</select>
+      <input type="file" id="${inputId}" accept="${ATT_ACCEPT_ALL}" multiple style="display:none" onchange="${inputOnchange}"/>
+    </div>`;
+}
+
 function attachmentsHtml(o) {
   const atts = Array.isArray(o.attachments) ? o.attachments : [];
-  return ATT_CATS.map(cat => {
+  let h = '';
+  ATT_CATS.forEach(cat => {
     const items = atts.filter(a => (a.category || 'Other') === cat);
-    return `<div class="att-cat">
-      <div class="att-cat-label">${cat}</div>
-      ${items.length ? `<div class="att-grid">${items.map(a => renderAtt(o, a)).join('')}</div>` : ''}
-      <label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" multiple style="display:none" onchange="handleAttachmentPick(event,${o.id},'${cat}')"/>📎 Add ${cat}</label>
-    </div>`;
-  }).join('');
+    if (!items.length) return;
+    h += `<div class="att-cat"><div class="att-cat-label">${cat}</div><div class="att-grid">${items.map(a => renderAtt(o, a)).join('')}</div></div>`;
+  });
+  h += attAdderHtml(o.id, `pickAttachmentCategory(this,${o.id})`, `att-file-${o.id}`, `handleAttachmentPick(event,${o.id},this.dataset.category)`);
+  return h;
 }
 
 function readAsDataURL(file) {
@@ -2855,12 +2869,27 @@ async function fileToAttachment(file, category, idBump) {
   }
 }
 
+// Chose a category from the "Add attachment" dropdown → open the file picker
+// for that category (Pictures shows photos only), remembering the category on
+// the hidden input so the pick handler knows where the files belong.
+function pickAttachmentCategory(sel, id) {
+  const cat = sel.value;
+  sel.value = ''; // reset so the same category can be chosen again next time
+  if (!cat) return;
+  const input = document.getElementById('att-file-' + id);
+  if (!input) return;
+  input.dataset.category = cat;
+  input.accept = attAcceptFor(cat);
+  input.click();
+}
+
 async function handleAttachmentPick(ev, id, category) {
   const files = ev.target.files ? Array.from(ev.target.files) : [];
   if (!files.length) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) { ev.target.value = ''; return; }
   if (!Array.isArray(o.attachments)) o.attachments = [];
+  category = category || 'Other';
   // Process every selected file so several photos can be added at once.
   for (let k = 0; k < files.length; k++) {
     const att = await fileToAttachment(files[k], category, k);
@@ -3304,18 +3333,33 @@ function openNewJob() {
 function njRenderAttachments() {
   const el = document.getElementById('nj-attachments');
   if (!el) return;
-  el.innerHTML = ATT_CATS.map(cat => {
+  let h = '';
+  ATT_CATS.forEach(cat => {
     const items = njAttachments.filter(a => (a.category || 'Other') === cat);
+    if (!items.length) return;
     const grid = items.map(a => {
       const isImg = a.type && a.type.indexOf('image/') === 0;
       if (isImg) return `<div class="att"><img src="${a.dataUrl}" onclick="njOpenAttachment(${a.id})"/><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
       const m = fileMeta(a);
       return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="njOpenAttachment(${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
     }).join('');
-    return `<div class="att-cat"><div class="att-cat-label">${cat}</div>${items.length?`<div class="att-grid">${grid}</div>`:''}<label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" multiple style="display:none" onchange="njHandleAttachmentPick(event,'${cat}')"/>📎 Add ${cat}</label></div>`;
-  }).join('');
+    h += `<div class="att-cat"><div class="att-cat-label">${cat}</div><div class="att-grid">${grid}</div></div>`;
+  });
+  h += attAdderHtml('nj', 'njPickAttachmentCategory(this)', 'nj-att-file', 'njHandleAttachmentPick(event,this.dataset.category)');
+  el.innerHTML = h;
+}
+function njPickAttachmentCategory(sel) {
+  const cat = sel.value;
+  sel.value = '';
+  if (!cat) return;
+  const input = document.getElementById('nj-att-file');
+  if (!input) return;
+  input.dataset.category = cat;
+  input.accept = attAcceptFor(cat);
+  input.click();
 }
 async function njHandleAttachmentPick(ev, category) {
+  category = category || 'Other';
   const files = ev.target.files ? Array.from(ev.target.files) : [];
   if (!files.length) return;
   // Process every selected file so several photos can be added at once.
