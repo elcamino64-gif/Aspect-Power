@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: hide-empty-date-placeholder -->
+<!-- build: set-date-button -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -207,8 +207,9 @@ textarea{resize:vertical;line-height:1.6}
 .bj-static{font-size:15px;color:#1d1d1f;padding:0 2px 4px;font-weight:500}
 .bj-title{font-size:22px;font-weight:800;color:#1d1d1f;margin:0 2px 12px;line-height:1.15}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
-/* Hide the browser's today's-date placeholder on an empty date field until it's focused or a date is picked */
-input[type=date].nodate:not(:focus)::-webkit-datetime-edit{color:transparent}
+/* Shown instead of an empty date field so no confusing grey date appears */
+.bj-setdate{display:block;width:100%;text-align:left;background:#f5f5f7;border:1px dashed #c7c7cc;color:#3a3a3c;font-size:15px;font-weight:500;padding:12px 14px;border-radius:12px;cursor:pointer;font-family:inherit}
+.bj-setdate:active{background:#ececef}
 .navtrio{display:flex;gap:6px;flex-wrap:wrap;width:100%;justify-content:center}
 .navtrio .btn-ghost{padding:7px 13px;font-size:13px}
 .navtrio .btn-ghost.on{background:#05befe;border-color:#05befe;color:#fff}
@@ -480,7 +481,8 @@ input[type=date].nodate:not(:focus)::-webkit-datetime-edit{color:transparent}
       <select id="nj-stage"></select>
 
       <label class="fl">Scheduled For</label>
-      <input type="date" id="nj-sched" class="nodate" onchange="this.classList.toggle('nodate', !this.value)"/>
+      <button type="button" id="nj-sched-btn" class="bj-setdate" onclick="njRevealSched()">📅 Tap to set a scheduled date</button>
+      <input type="date" id="nj-sched" style="display:none"/>
 
       <label class="fl">Added By</label>
       <select id="nj-by"><option value="">Select...</option></select>
@@ -3003,7 +3005,12 @@ function showBoardJob(id) {
     <div class="bj-title">${escHtml(o.park||'—')}</div>
 
     <label class="fl">Scheduled For</label>
-    <input type="date" class="${o.scheduledDate?'':'nodate'}" value="${escHtml(o.scheduledDate||'')}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); this.classList.toggle('nodate', !this.value)"/>
+    ${o.scheduledDate
+      ? `<div style="display:flex;gap:8px;align-items:center">
+           <input type="date" value="${escHtml(o.scheduledDate)}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); if(!this.value) showBoardJob(${o.id})" style="flex:1"/>
+           <button type="button" class="btn-ghost" style="flex-shrink:0;padding:10px 12px" onclick="editBoardJobField(${o.id},'scheduledDate',''); showBoardJob(${o.id})">Clear</button>
+         </div>`
+      : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`}
     <label class="fl">Stage</label>
     <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
     <label class="fl">Added By</label>
@@ -3059,6 +3066,18 @@ function editBoardJobField(id, field, value) {
     upsertPropertyContact(o.park, { name: o.contact, title: o.contactTitle, phone: o.contactPhone, email: o.contactEmail });
   }
   if (field === 'type' || field === 'park') showBoardJob(id); // refresh the shown address/contact for the new property
+}
+// Swap the "Tap to set a scheduled date" button for a real date picker.
+function revealScheduleInput(id) {
+  const btn = document.getElementById('setdate-' + id);
+  if (!btn) return;
+  const inp = document.createElement('input');
+  inp.type = 'date';
+  inp.style.width = '100%';
+  inp.onchange = () => { editBoardJobField(id, 'scheduledDate', inp.value); showBoardJob(id); };
+  btn.replaceWith(inp);
+  inp.focus();
+  if (inp.showPicker) { try { inp.showPicker(); } catch(e){} }
 }
 // Edit the property's address from a job — saved to the property directory
 // (shared by every job at that property).
@@ -3159,11 +3178,19 @@ function njSetType(t) {
   const njStage = document.getElementById('nj-stage');
   if (njStage) njStage.value = 'Inquiries';
 }
+function njRevealSched() {
+  const btn = document.getElementById('nj-sched-btn');
+  const inp = document.getElementById('nj-sched');
+  if (btn) btn.style.display = 'none';
+  if (inp) { inp.style.display = ''; inp.focus(); if (inp.showPicker) { try { inp.showPicker(); } catch(e){} } }
+}
 function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
   ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email','nj-sched'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  const njSched = document.getElementById('nj-sched'); if (njSched) njSched.classList.add('nodate'); // blank until a date is picked
+  // Reset the scheduled-date control back to its "Tap to set" button
+  const njSched = document.getElementById('nj-sched'); if (njSched) njSched.style.display = 'none';
+  const njSchedBtn = document.getElementById('nj-sched-btn'); if (njSchedBtn) njSchedBtn.style.display = '';
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
