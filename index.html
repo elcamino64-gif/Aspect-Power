@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: signout-on-board -->
+<!-- build: scheduled-date-sort -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -472,6 +472,9 @@ textarea{resize:vertical;line-height:1.6}
     <div class="sheet-body">
       <label class="fl">Stage</label>
       <select id="nj-stage"></select>
+
+      <label class="fl">Scheduled For</label>
+      <input type="date" id="nj-sched"/>
 
       <label class="fl">Added By</label>
       <select id="nj-by"><option value="">Select...</option></select>
@@ -2626,7 +2629,8 @@ function jobToRow(j){
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
     location:j.spaceLocation, description:j.description, amount:j.total,
     status_tag:j.statusTag, contact:packContact(j), notes:j.otherNotes,
-    checklist:j.checklist, attachments:j.attachments || [] };
+    checklist:j.checklist, attachments:j.attachments || [],
+    scheduled_date:j.scheduledDate || null };
 }
 function rowToJob(r){
   return { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
@@ -2634,6 +2638,7 @@ function rowToJob(r){
     total:parseFloat(r.amount)||0, statusTag:r.status_tag||'',
     ...unpackContact(r.contact),
     otherNotes:r.notes||'', date:r.created_at ? String(r.created_at).slice(0,10) : '',
+    scheduledDate:r.scheduled_date || '',
     checklist:Array.isArray(r.checklist)?r.checklist:[],
     attachments:Array.isArray(r.attachments)?r.attachments:[] };
 }
@@ -2663,15 +2668,13 @@ async function saveBoardJobToCloud(job){
     body: JSON.stringify(payload)
   });
   try {
-    const row = jobToRow(job);
-    let res = await post(row);
-    if (!res.ok) {
-      // e.g. older table without the attachments column — retry without it
-      const { attachments, ...noAtt } = row;
-      console.warn('saveBoardJobToCloud retry without attachments:', res.status, await res.text());
-      res = await post(noAtt);
-      if (!res.ok) console.warn('saveBoardJobToCloud failed (saved locally):', res.status, await res.text());
-    }
+    const full = jobToRow(job);
+    const { scheduled_date, ...noSched } = full;      // table may lack scheduled_date
+    const { attachments, ...noSchedNoAtt } = noSched; // older table may also lack attachments
+    let res = await post(full);
+    if (!res.ok) res = await post(noSched);
+    if (!res.ok) res = await post(noSchedNoAtt);
+    if (!res.ok) console.warn('saveBoardJobToCloud failed (saved locally):', res.status, await res.text());
   } catch(e) { console.error('saveBoardJobToCloud network error (saved locally):', e); }
 }
 async function deleteBoardJobFromCloud(id){
@@ -2727,6 +2730,7 @@ function boardCardHtml(o) {
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
     <div class="board-card-meta">
       <span class="board-ava" style="background:${av.color}">${av.initials}</span>
+      ${o.scheduledDate?`<span class="board-tag" style="background:#05befe1e;color:#0684b3">📅 ${fmtDate(o.scheduledDate)}</span>`:''}
       ${tagHtml}
     </div>
     ${boardDetailHtml(o)}
@@ -2911,7 +2915,15 @@ function renderBoard() {
   const prevX = scroller.scrollLeft, prevY = scroller.scrollTop;
   const visible = boardJobs.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
   canvas.innerHTML = STAGES.map(stage => {
-    const cards = visible.filter(o => normalizeStage(o.status) === stage.name);
+    const cards = visible.filter(o => normalizeStage(o.status) === stage.name)
+      // Sort by Scheduled For, most recent date at the top; undated jobs last.
+      .sort((a,b) => {
+        const da = a.scheduledDate || '', db = b.scheduledDate || '';
+        if (da && db) return db < da ? -1 : (db > da ? 1 : 0); // YYYY-MM-DD, descending
+        if (da && !db) return -1;
+        if (!da && db) return 1;
+        return 0;
+      });
     return `<div class="board-col">
       <div class="board-col-head">
         <span class="board-dot" style="background:${stage.color}"></span>
@@ -2984,6 +2996,8 @@ function showBoardJob(id) {
   const amtVal = amt > 0 ? '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
   document.getElementById('boardjob-content').innerHTML = `
     ${o.date?`<label class="fl" style="margin-top:0">Added</label><div class="bj-static">${fmtDate(o.date)}</div>`:''}
+    <label class="fl">Scheduled For</label>
+    <input type="date" value="${escHtml(o.scheduledDate||'')}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value)"/>
     <label class="fl">Added By</label>
     <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
     <label class="fl">Park / Property</label>
@@ -3118,7 +3132,7 @@ function njSetType(t) {
 function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
-  ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email','nj-sched'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
@@ -3354,6 +3368,7 @@ function saveNewJob() {
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
     status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
+    scheduledDate: document.getElementById('nj-sched').value || '',
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
     contactTitle: document.getElementById('nj-contact-title').value.trim(),
