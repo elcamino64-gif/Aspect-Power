@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: mileage-list-2 -->
+<!-- build: edit-order-remove-servicecall -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -377,7 +377,7 @@ textarea{resize:vertical;line-height:1.6}
   <div class="scroll">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <span style="font-size:12px;color:#86868b" id="list-count">0 work orders</span>
-      <button class="add-new-sm" onclick="showForm()">+ New Work Order</button>
+      <button class="add-new-sm" onclick="newOrder()">+ New Work Order</button>
     </div>
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
@@ -452,12 +452,6 @@ textarea{resize:vertical;line-height:1.6}
   <div class="sheet">
     <div class="sheet-head"><b>New Job</b><button onclick="closeNewJob()">Cancel</button></div>
     <div class="sheet-body">
-      <label class="fl">Type</label>
-      <div class="typetoggle">
-        <button type="button" id="nj-type-project" onclick="njSetType('project')">Project</button>
-        <button type="button" id="nj-type-service" onclick="njSetType('service')">Service Call</button>
-      </div>
-
       <label class="fl">Stage</label>
       <select id="nj-stage"></select>
 
@@ -1707,8 +1701,11 @@ function saveOrder() {
 
   materials.filter(m => m.desc && m.desc.trim()).forEach(m => updateMatDB(m.desc.trim(), m.cost, m.category));
 
+  // If we opened an existing order to revise it, keep its id and update it in
+  // place; otherwise create a new one.
+  const existing = currentOrderId != null ? orders.find(o => o.id === currentOrderId) : null;
   const order = {
-    id: Date.now(),
+    id: existing ? existing.id : Date.now(),
     date, by, park,
     spaceLocation: document.getElementById('f-space').value,
     description: document.getElementById('f-desc').value,
@@ -1723,11 +1720,60 @@ function saveOrder() {
     total: calcTotal()
   };
   updateDatabaseFromOrder(order);
-  orders.unshift(order);
+  if (existing) {
+    const i = orders.findIndex(o => o.id === existing.id);
+    orders[i] = order;
+  } else {
+    orders.unshift(order);
+  }
   try { localStorage.setItem('workOrders', JSON.stringify(orders)); } catch(e){}
-  saveOrderToCloud(order);
+  saveOrderToCloud(order); // upserts by id, so an edit replaces the cloud copy
   resetForm();
   showList();
+}
+
+// Open an existing work order in the form to revise it.
+function editOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  resetForm();
+  currentOrderId = id;
+  populateDropdowns();
+  const parkSel = document.getElementById('f-park');
+  if (o.park && parkSel && ![...parkSel.options].some(op => op.value === o.park)) {
+    parkSel.insertAdjacentHTML('beforeend', `<option value="${o.park}">${o.park}</option>`);
+  }
+  const bySel = document.getElementById('f-by');
+  if (o.by && bySel && ![...bySel.options].some(op => op.value === o.by)) {
+    bySel.insertAdjacentHTML('beforeend', `<option value="${o.by}">${o.by}</option>`);
+  }
+  document.getElementById('f-date').value = o.date || '';
+  bySel.value = o.by || '';
+  parkSel.value = o.park || '';
+  document.getElementById('f-space').value = o.spaceLocation || '';
+  document.getElementById('f-desc').value = o.description || '';
+  document.getElementById('f-notes').value = o.otherNotes || '';
+  document.getElementById('f-vehicles').value = o.fuelVehicles || '0';
+  materials = (o.materials && o.materials.length) ? o.materials.map(m=>({...m})) : [{desc:'',qty:'',cost:'',category:'',manufacturer:''}];
+  testingServices = (o.testing||[]).map(t=>({...t}));
+  techLabor = (o.techLabor && o.techLabor.length) ? o.techLabor.map(r=>({...r})) : [{rate:'225',hours:'',type:'RT'}];
+  techAssist = (o.techAssist && o.techAssist.length) ? o.techAssist.map(r=>({...r})) : [{rate:'150',hours:'',type:'RT'}];
+  laborers = (o.laborers && o.laborers.length) ? o.laborers.map(r=>({...r})) : [{rate:'150',hours:'',type:'RT'}];
+  currentStatus = o.status || '';
+  document.getElementById('btn-complete').className = 'status-btn' + (currentStatus==='Complete'?' complete':'');
+  document.getElementById('btn-inprogress').className = 'status-btn' + (currentStatus==='In Progress'?' inprogress':'');
+  renderMaterials();
+  renderTestingServices();
+  renderLabor();
+  showMileage(o.park);
+  updateTotal();
+  showForm();
+}
+
+// Start a brand-new work order (clears any order being revised).
+function newOrder() {
+  resetForm();
+  showForm();
 }
 
 function resetForm() {
@@ -1749,6 +1795,7 @@ function resetForm() {
   techAssist = [{rate:'150',hours:'',type:'RT'}];
   laborers = [{rate:'150',hours:'',type:'RT'}];
   currentStatus = '';
+  currentOrderId = null; // starting fresh — Save will create a new order
   document.getElementById('btn-complete').className = 'status-btn';
   document.getElementById('btn-inprogress').className = 'status-btn';
   renderMaterials();
@@ -1805,7 +1852,8 @@ function showDetail(id) {
       <span class="total-label">Total</span>
       <span class="total-amount">$${orderTotal(o).toFixed(2)}</span>
     </div>
-    <button class="btn-primary" onclick="sendOrder(${o.id})" style="margin-top:0">📧 Send</button>
+    <button class="btn-primary" onclick="editOrder(${o.id})" style="margin-top:0">✏️ Edit Work Order</button>
+    <button class="btn-primary" onclick="sendOrder(${o.id})" style="margin-top:10px">📧 Send</button>
     <div style="height:32px"></div>
   `;
 }
@@ -2561,12 +2609,10 @@ function setBoardFilter(f) {
 
 function boardCardHtml(o) {
   const col = stageColor(o.status);
-  const isProj = o.type === 'project';
   const av = avatarFor(o.by);
   const tagHtml = o.statusTag ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
   return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
-      <span class="board-badge ${isProj?'board-badge-proj':'board-badge-svc'}">${isProj?'Project':'Service'}</span>
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
       ${isJobNew(o)?'<span class="board-new-pill" title="New — just added or its status changed since you last opened it">NEW</span>':''}
     </div>
@@ -2819,7 +2865,6 @@ function showBoardJob(id) {
   badge.className = 'status-badge';
   badge.style.color = stageColor(o.status);
   badge.style.background = stageColor(o.status) + '18';
-  const isProj = o.type === 'project';
   const amt = parseFloat(o.total) || 0;
   const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
   const techList = technicians.slice();
@@ -2831,12 +2876,7 @@ function showBoardJob(id) {
     parkList.map(pn => `<option value="${escHtml(pn)}"${pn===o.park?' selected':''}>${escHtml(pn)}</option>`).join('');
   const amtVal = amt > 0 ? '$' + amt.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
   document.getElementById('boardjob-content').innerHTML = `
-    <label class="fl" style="margin-top:0">Type</label>
-    <div class="typetoggle">
-      <button type="button" class="${isProj?'on':''}" onclick="editBoardJobField(${o.id},'type','project')">Project</button>
-      <button type="button" class="${!isProj?'on':''}" onclick="editBoardJobField(${o.id},'type','service')">Service Call</button>
-    </div>
-    ${o.date?`<label class="fl">Added</label><div class="bj-static">${fmtDate(o.date)}</div>`:''}
+    ${o.date?`<label class="fl" style="margin-top:0">Added</label><div class="bj-static">${fmtDate(o.date)}</div>`:''}
     <label class="fl">Added By</label>
     <select onchange="editBoardJobField(${o.id},'by',this.value)">${techOpts}</select>
     <label class="fl">Park / Property</label>
@@ -2964,12 +3004,9 @@ function removeBoardJob(id) {
 // ── New Job bottom sheet ──────────────────────────────────
 let njType = 'project';
 function njSetType(t) {
-  njType = t;
-  document.getElementById('nj-type-project').className = (t==='project' ? 'on' : '');
-  document.getElementById('nj-type-service').className = (t==='service' ? 'on' : '');
-  // Service calls default to "Scheduled"; projects start at "Inquiries"
+  njType = t || 'project';
   const njStage = document.getElementById('nj-stage');
-  if (njStage) njStage.value = (t === 'service') ? 'Scheduled' : 'Inquiries';
+  if (njStage) njStage.value = 'Inquiries';
 }
 function openNewJob() {
   populateBoardDropdowns();
@@ -3214,8 +3251,6 @@ function saveNewJob() {
   if (job.contact || job.contactPhone || job.contactEmail) {
     upsertPropertyContact(park, { name: job.contact, title: job.contactTitle, phone: job.contactPhone, email: job.contactEmail });
   }
-  // A Service Call automatically gets one invoice-ready work order
-  if (job.type === 'service') createWorkOrderFromJob(job);
   njAttachments = [];
   expandedBoardId = job.id;
   closeNewJob();
