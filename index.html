@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: email-unit-price-real -->
+<!-- build: email-hide-empty-labor -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1844,9 +1844,12 @@ function sendOrder(id) {
 
 function buildPlainEmail(o) {
   const matTotal = o.materials.reduce((s,m)=>s+(parseFloat(m.qty)||1)*(parseFloat(m.cost)||0),0);
-  const techRows = o.techLabor.filter(r=>r.rate||r.hours);
-  const assistRows = (o.techAssist||[]).filter(r=>r.rate||r.hours);
-  const labRows  = o.laborers.filter(r=>r.rate||r.hours);
+  // Only include a labor line when hours were actually entered — every row has a
+  // pre-filled rate, so filtering on rate alone would show empty $0.00 sections.
+  const hasHours = r => (parseFloat(r.hours)||0) > 0;
+  const techRows = o.techLabor.filter(hasHours);
+  const assistRows = (o.techAssist||[]).filter(hasHours);
+  const labRows  = o.laborers.filter(hasHours);
   const matRows  = o.materials.filter(m=>m.desc||m.cost);
   let b = '';
 
