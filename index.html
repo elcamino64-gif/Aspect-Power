@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: email-hide-empty-labor -->
+<!-- build: mileage-fuel-autofill -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -996,7 +996,9 @@ function calcTotal() {
   const tech = techLabor.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const assist = techAssist.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const lab = laborers.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
-  return mat + test + tech + assist + lab;
+  const parkEl = document.getElementById('f-park');
+  const fuel = parkEl ? fuelCostFor(parkEl.value) : 0;
+  return mat + test + tech + assist + lab + fuel;
 }
 
 function updateTotal() {
@@ -1042,12 +1044,61 @@ function populateDropdowns() {
 
 function handleParkChange(val) {
   showMileage(val);
+  updateTotal(); // fuel surcharge depends on the property
 }
 function handleTechChange(val) { /* just use the selected value */ }
 
-// ── MILEAGE (manual entry, remembered per property) ───────
+// ── MILEAGE (round-trip miles from shop; fuel = miles × $0.75) ────────────
 let mileageDB = {};
 try { mileageDB = JSON.parse(localStorage.getItem('mileageDB') || '{}'); } catch(e){}
+
+const FUEL_RATE = 0.75; // dollars per round-trip mile
+// Round-trip mileage (shop → park → shop) from the office mileage sheet. Baked
+// in so it auto-fills on every device with no setup. A value saved by hand for
+// a property overrides the sheet.
+const DEFAULT_MILEAGE = {
+  'Bayshore Villa': 116, 'California Hawaiian': 124, 'Calistoga Springs': 120,
+  'Casa Del Lago': 104, 'Chateau Calistoga': 114, 'Chateau Mobile Home': 36,
+  'Clayton Palms': 50, 'Colonial Mobile Manor': 126, 'Concord Cascade': 0,
+  'Concord Mobile CC': 0, 'Contempo Marin': 72, 'Crestview Mobile': 0,
+  'De Anza Santa Cruz': 176, 'Diablo Mobile Lodge': 0, 'Eagle City Mobile': 48,
+  'Eastridge Estates': 110, 'Fairway Oaks': 368, 'Hayward Mobile CC': 80,
+  'Imperial Stockton': 120, 'La Buona Vita': 110, 'La Siesta Village': 68,
+  'Lamplighter – San Jose': 106, 'Leisure Lake': 96, 'Marin Valley CC': 78,
+  'Meadows': 26, 'Monte Del Lago': 109, 'Napa Valley MHP': 70,
+  'Newells Mobile City': 68, 'Oakcrest Estates': 104, 'Oaktree Vineyard': 70,
+  'Orchard Estates': 110, 'Plaza Del Rey': 110, 'Paso De Palomas': 122,
+  'Pueblo Serena': 82, 'Rancho Benicia': 13, 'Rancho Cabeza': 118,
+  'Rancho De Calistoga': 114, 'Rancho De Napa': 78, 'Rancho Diablo': 0,
+  'Rincon Valley': 94, 'San Jose Verde': 120, 'Santa Rosa Village': 124,
+  'Shadow Lake': 122, 'Sierra Lakes': 170, 'Silicon Valley Village': 104,
+  'Spanish Ranch': 86, 'Summerfield @ Canyon Creek': 36, 'Sunshadow MHP': 114,
+  'Tahoe Verde': 322, 'Valhalla MHP': 116, 'Village of the Four Seasons': 128,
+  'Walnut Acres': 68, 'Winters MHP': 90, 'Woodgate': 58
+};
+function normPark(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+const DEFAULT_MILEAGE_NORM = {};
+Object.keys(DEFAULT_MILEAGE).forEach(k => { DEFAULT_MILEAGE_NORM[normPark(k)] = DEFAULT_MILEAGE[k]; });
+// Round-trip miles for a property: a hand-saved value wins, else the sheet
+// (matched ignoring case, spaces and punctuation). null if unknown.
+function lookupMileage(property){
+  if (!property) return null;
+  const man = mileageDB[property];
+  if (man != null && String(man).trim() !== '') { const v = parseFloat(man); if (!isNaN(v)) return v; }
+  const d = DEFAULT_MILEAGE_NORM[normPark(property)];
+  return (d != null) ? d : null;
+}
+function fuelCostFor(property){ const m = lookupMileage(property); return m != null ? m * FUEL_RATE : 0; }
+// Grand total of an order, always including the fuel surcharge for its property,
+// so the figure stays consistent no matter when the order was saved.
+function orderTotal(o){
+  const mat = (o.materials||[]).reduce((s,m)=>s+(parseFloat(m.qty)||1)*(parseFloat(m.cost)||0),0);
+  const test = (o.testing||[]).reduce((s,t)=>s+(parseFloat(t.cost)||0),0);
+  const tech = (o.techLabor||[]).reduce((s,r)=>s+(parseFloat(r.rate)||0)*(parseFloat(r.hours)||0),0);
+  const assist = (o.techAssist||[]).reduce((s,r)=>s+(parseFloat(r.rate)||0)*(parseFloat(r.hours)||0),0);
+  const lab = (o.laborers||[]).reduce((s,r)=>s+(parseFloat(r.rate)||0)*(parseFloat(r.hours)||0),0);
+  return mat + test + tech + assist + lab + fuelCostFor(o.park);
+}
 
 function saveMileageDB() {
   try { localStorage.setItem('mileageDB', JSON.stringify(mileageDB)); } catch(e){}
@@ -1071,22 +1122,24 @@ function showMileage(property) {
   if (!refEl) return;
   if (!property) { refEl.innerHTML = ''; return; }
 
-  const known = mileageDB[property];
-  if (known) {
-    refEl.innerHTML = `📍 ~${known} miles from shop (one-way) <button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px">edit</button>`;
+  const miles = lookupMileage(property);
+  const editBtn = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px">edit</button>`;
+  if (miles != null) {
+    refEl.innerHTML = `⛽ ${miles} mi round trip × $${FUEL_RATE.toFixed(2)} = $${(miles*FUEL_RATE).toFixed(2)} fuel ${editBtn}`;
   } else {
-    refEl.innerHTML = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0">+ Add mileage for this property</button>`;
+    refEl.innerHTML = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#05befe;font-size:12px;text-decoration:underline;cursor:pointer;padding:0">+ Add round-trip mileage for this property</button>`;
   }
 }
 
 function editMileage(property) {
-  showModal('Mileage to ' + property, 'Miles from shop (one-way)', null, (val) => {
+  showModal('Mileage to ' + property, 'Round-trip miles (shop → park → shop)', null, (val) => {
     const trimmed = val.trim().replace(/[^0-9.]/g, '');
     if (!trimmed) return;
     mileageDB[property] = trimmed;
     saveMileageDB();
     saveMileageToCloud(property, trimmed);
     showMileage(property);
+    updateTotal(); // fuel surcharge changed
   });
 }
 
@@ -1739,11 +1792,11 @@ function showDetail(id) {
     ${techLines?`<div class="detail-card"><div class="detail-card-title">Technical Labor</div>${techLines}</div>`:''}
     ${assistLines?`<div class="detail-card"><div class="detail-card-title">Technicians Assistant</div>${assistLines}</div>`:''}
     ${labLines?`<div class="detail-card"><div class="detail-card-title">Laborer</div>${labLines}</div>`:''}
-    <div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${o.fuelVehicles||1} vehicle(s)</span><span class="detail-value" style="color:#86868b">$0.75/mile – office calculates</span></div></div>
+    ${(()=>{ const mi=lookupMileage(o.park); return `<div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${mi!=null?`${mi} mi round trip × $${FUEL_RATE.toFixed(2)}`:`${o.fuelVehicles||1} vehicle(s)`}</span><span class="detail-value"${mi!=null?'':' style="color:#86868b"'}>${mi!=null?`$${(mi*FUEL_RATE).toFixed(2)}`:'office calculates'}</span></div></div>`; })()}
     ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${o.otherNotes}</div></div>`:''}
     <div class="total-box" style="margin-top:16px">
       <span class="total-label">Total</span>
-      <span class="total-amount">$${o.total.toFixed(2)}</span>
+      <span class="total-amount">$${orderTotal(o).toFixed(2)}</span>
     </div>
     <button class="btn-primary" onclick="sendOrder(${o.id})" style="margin-top:0">📧 Send</button>
     <div style="height:32px"></div>
@@ -1778,7 +1831,7 @@ function renderList() {
         onclick="cardTap(${o.id})">
         <div class="order-row" style="margin-bottom:4px">
           <span class="order-title">${o.park||'—'}</span>
-          <span class="order-amount">$${o.total.toFixed(2)}</span>
+          <span class="order-amount">$${orderTotal(o).toFixed(2)}</span>
         </div>
         <div class="order-row">
           <span class="order-meta">${o.by||''} · ${fmtDate(o.date)}</span>
@@ -1910,14 +1963,19 @@ function buildPlainEmail(o) {
   }
 
   b += `\n${'─'.repeat(40)}\nFUEL SURCHARGE\n\n`;
-  b += `${o.fuelVehicles||1} vehicle(s)   $0.75/mile — calculated by office\n`;
+  const fuelMiles = lookupMileage(o.park);
+  if (fuelMiles != null) {
+    b += `${fuelMiles} mi round trip × $${FUEL_RATE.toFixed(2)}/mi  =  $${(fuelMiles*FUEL_RATE).toFixed(2)}\n`;
+  } else {
+    b += `${o.fuelVehicles||1} vehicle(s)   $0.75/mile — calculated by office\n`;
+  }
 
   if (o.otherNotes) {
     b += `\n${'─'.repeat(40)}\nNOTES\n\n${o.otherNotes}\n`;
   }
 
   b += `\n${'═'.repeat(40)}\n`;
-  b += `TOTAL:  $${o.total.toFixed(2)}\n`;
+  b += `TOTAL:  $${orderTotal(o).toFixed(2)}\n`;
   b += `${'═'.repeat(40)}\n\n`;
   b += `Aspect Power  |  aspectpower.com  |  CA Lic #933699`;
   return b;
