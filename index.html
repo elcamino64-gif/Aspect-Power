@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: scheduled-column -->
+<!-- build: rts-rename-multi-photo -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2179,7 +2179,7 @@ function updateOrderCount() {
 const STAGES = [
   { name: 'Inquiries',                 color: '#86868B' },
   { name: 'Approved',                  color: '#2E97F2' },
-  { name: 'Permit Pending',            color: '#F5A623' },
+  { name: 'Ready to Schedule',         color: '#F5A623' },
   { name: 'Scheduled',                 color: '#12B5AE' },
   { name: 'In Progress',               color: '#8257E6' },
   { name: 'Complete — Ready to Bill',  color: '#34C759' }
@@ -2355,7 +2355,7 @@ function normalizeStage(status) {
   if (!status) return 'Inquiries';
   if (STAGES.some(s => s.name === status)) return status;
   if (status === 'Quoted') return 'Approved';                 // renamed stage
-  if (status === 'Ready to Schedule') return 'Scheduled';     // renamed stage
+  if (status === 'Permit Pending') return 'Ready to Schedule';// renamed stage
   if (status === 'Inspection / PG&E') return 'In Progress';   // removed stage → nearest
   if (status === 'Complete') return 'Complete — Ready to Bill';
   return 'Inquiries';
@@ -2540,7 +2540,7 @@ function attachmentsHtml(o) {
     return `<div class="att-cat">
       <div class="att-cat-label">${cat}</div>
       ${items.length ? `<div class="att-grid">${items.map(a => renderAtt(o, a)).join('')}</div>` : ''}
-      <label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" style="display:none" onchange="handleAttachmentPick(event,${o.id},'${cat}')"/>📎 Add ${cat}</label>
+      <label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" multiple style="display:none" onchange="handleAttachmentPick(event,${o.id},'${cat}')"/>📎 Add ${cat}</label>
     </div>`;
   }).join('');
 }
@@ -2574,27 +2574,31 @@ function compressImage(file, maxDim, quality) {
 }
 
 async function handleAttachmentPick(ev, id, category) {
-  const file = ev.target.files && ev.target.files[0];
-  if (!file) return;
+  const files = ev.target.files ? Array.from(ev.target.files) : [];
+  if (!files.length) return;
   const o = boardJobs.find(x => x.id === id);
-  if (!o) return;
-  try {
-    let dataUrl, type = file.type || 'application/octet-stream';
-    if (type.indexOf('image/') === 0) {
-      dataUrl = await compressImage(file, 1400, 0.7);
-      type = 'image/jpeg';
-    } else {
-      if (file.size > 4 * 1024 * 1024) { alert('That file is over 4 MB. Please attach a smaller file (or a photo).'); ev.target.value = ''; return; }
-      dataUrl = await readAsDataURL(file);
+  if (!o) { ev.target.value = ''; return; }
+  if (!Array.isArray(o.attachments)) o.attachments = [];
+  // Process every selected file so several photos can be added at once.
+  for (let k = 0; k < files.length; k++) {
+    const file = files[k];
+    try {
+      let dataUrl, type = file.type || 'application/octet-stream';
+      if (type.indexOf('image/') === 0) {
+        dataUrl = await compressImage(file, 1400, 0.7);
+        type = 'image/jpeg';
+      } else {
+        if (file.size > 4 * 1024 * 1024) { alert('"' + file.name + '" is over 4 MB and was skipped. Please attach a smaller file (or a photo).'); continue; }
+        dataUrl = await readAsDataURL(file);
+      }
+      o.attachments.push({ id: Date.now() + k, name: file.name, type, category: category || 'Other', dataUrl });
+    } catch (e) {
+      console.error('attachment failed:', e);
+      alert('Sorry, "' + file.name + '" could not be attached.');
     }
-    if (!Array.isArray(o.attachments)) o.attachments = [];
-    o.attachments.push({ id: Date.now(), name: file.name, type, category: category || 'Other', dataUrl });
-    persistBoardJob(o);
-    refreshBoardViews();
-  } catch (e) {
-    console.error('attachment failed:', e);
-    alert('Sorry, that file could not be attached. Please try another.');
   }
+  persistBoardJob(o);
+  refreshBoardViews();
   ev.target.value = '';
 }
 
@@ -2838,7 +2842,7 @@ function answerPermit(yes) {
   document.getElementById('permit-overlay').style.display = 'none';
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  o.status = yes ? 'Permit Pending' : 'Scheduled';
+  o.status = yes ? 'Ready to Schedule' : 'Scheduled';
   persistBoardJob(o);
   seenStages[id] = normalizeStage(o.status); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
@@ -2923,19 +2927,23 @@ function njRenderAttachments() {
         ? `<div class="att"><img src="${a.dataUrl}" onclick="njOpenAttachment(${a.id})"/><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`
         : `<div class="att att-file"><span class="att-name" onclick="njOpenAttachment(${a.id})">${icon} ${escHtml(a.name)}</span><button class="att-del" onclick="njDeleteAttachment(${a.id})">×</button></div>`;
     }).join('');
-    return `<div class="att-cat"><div class="att-cat-label">${cat}</div>${items.length?`<div class="att-grid">${grid}</div>`:''}<label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" style="display:none" onchange="njHandleAttachmentPick(event,'${cat}')"/>📎 Add ${cat}</label></div>`;
+    return `<div class="att-cat"><div class="att-cat-label">${cat}</div>${items.length?`<div class="att-grid">${grid}</div>`:''}<label class="att-add"><input type="file" accept="image/*,application/pdf,.pdf,.doc,.docx" multiple style="display:none" onchange="njHandleAttachmentPick(event,'${cat}')"/>📎 Add ${cat}</label></div>`;
   }).join('');
 }
 async function njHandleAttachmentPick(ev, category) {
-  const file = ev.target.files && ev.target.files[0];
-  if (!file) return;
-  try {
-    let dataUrl, type = file.type || 'application/octet-stream';
-    if (type.indexOf('image/') === 0) { dataUrl = await compressImage(file, 1400, 0.7); type = 'image/jpeg'; }
-    else { if (file.size > 4 * 1024 * 1024) { alert('That file is over 4 MB. Please attach a smaller file (or a photo).'); ev.target.value=''; return; } dataUrl = await readAsDataURL(file); }
-    njAttachments.push({ id: Date.now(), name: file.name, type, category: category || 'Other', dataUrl });
-    njRenderAttachments();
-  } catch (e) { console.error('nj attachment failed:', e); alert('Sorry, that file could not be attached.'); }
+  const files = ev.target.files ? Array.from(ev.target.files) : [];
+  if (!files.length) return;
+  // Process every selected file so several photos can be added at once.
+  for (let k = 0; k < files.length; k++) {
+    const file = files[k];
+    try {
+      let dataUrl, type = file.type || 'application/octet-stream';
+      if (type.indexOf('image/') === 0) { dataUrl = await compressImage(file, 1400, 0.7); type = 'image/jpeg'; }
+      else { if (file.size > 4 * 1024 * 1024) { alert('"' + file.name + '" is over 4 MB and was skipped.'); continue; } dataUrl = await readAsDataURL(file); }
+      njAttachments.push({ id: Date.now() + k, name: file.name, type, category: category || 'Other', dataUrl });
+    } catch (e) { console.error('nj attachment failed:', e); alert('Sorry, "' + file.name + '" could not be attached.'); }
+  }
+  njRenderAttachments();
   ev.target.value = '';
 }
 function njDeleteAttachment(attId) {
