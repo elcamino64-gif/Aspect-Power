@@ -35,6 +35,8 @@ create table if not exists board_jobs (
 -- If board_jobs already existed from an earlier run, make sure the newer
 -- columns are present (safe to run repeatedly).
 alter table board_jobs add column if not exists attachments jsonb default '[]'::jsonb;
+-- Scheduled-for date on each job (used to sort the board columns).
+alter table board_jobs add column if not exists scheduled_date text;
 
 -- Allow the app (anon key) to read/write, matching the existing tables.
 alter table board_jobs enable row level security;
