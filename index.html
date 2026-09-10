@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: card-sched-larger -->
+<!-- build: card-scheduled-label -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2721,7 +2721,6 @@ function setBoardFilter(f) {
 
 function boardCardHtml(o) {
   const col = stageColor(o.status);
-  const av = avatarFor(o.by);
   const tagHtml = o.statusTag ? `<span class="board-tag" style="background:${col}1e;color:${col}">${escHtml(o.statusTag)}</span>` : '';
   return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
@@ -2730,10 +2729,7 @@ function boardCardHtml(o) {
     </div>
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
-    <div class="board-card-meta">
-      <span class="board-ava" style="background:${av.color}">${av.initials}</span>
-      ${o.scheduledDate?`<span class="board-sched">📅 ${fmtDate(o.scheduledDate)}</span>`:''}
-    </div>
+    ${o.scheduledDate?`<div class="board-card-meta"><span class="board-sched">📅 Scheduled ${fmtDate(o.scheduledDate)}</span></div>`:''}
     ${tagHtml?`<div class="board-card-tagrow">${tagHtml}</div>`:''}
     ${boardDetailHtml(o)}
   </div>`;
