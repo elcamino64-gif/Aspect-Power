@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: space-location-plain -->
+<!-- build: material-one-line -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1994,7 +1994,7 @@ function buildPlainEmail(o) {
       const qty = parseFloat(m.qty)||1;
       const unit = parseFloat(m.cost)||0;
       const total = (qty*unit).toFixed(2);
-      b += `${m.desc||'—'}\n   ${qty} @ $${unit.toFixed(2)}/ea  =  $${total}\n`;
+      b += `${m.desc||'—'}  —  ${qty} @ $${unit.toFixed(2)}/ea = $${total}\n`;
     });
     b += `\nMaterials Subtotal:  $${matTotal.toFixed(2)}\n`;
   }
