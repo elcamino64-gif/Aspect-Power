@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: order-sync-and-email -->
+<!-- build: scheduled-column -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2180,7 +2180,7 @@ const STAGES = [
   { name: 'Inquiries',                 color: '#86868B' },
   { name: 'Approved',                  color: '#2E97F2' },
   { name: 'Permit Pending',            color: '#F5A623' },
-  { name: 'Ready to Schedule',         color: '#12B5AE' },
+  { name: 'Scheduled',                 color: '#12B5AE' },
   { name: 'In Progress',               color: '#8257E6' },
   { name: 'Complete — Ready to Bill',  color: '#34C759' }
 ];
@@ -2355,6 +2355,7 @@ function normalizeStage(status) {
   if (!status) return 'Inquiries';
   if (STAGES.some(s => s.name === status)) return status;
   if (status === 'Quoted') return 'Approved';                 // renamed stage
+  if (status === 'Ready to Schedule') return 'Scheduled';     // renamed stage
   if (status === 'Inspection / PG&E') return 'In Progress';   // removed stage → nearest
   if (status === 'Complete') return 'Complete — Ready to Bill';
   return 'Inquiries';
@@ -2820,9 +2821,9 @@ let permitJobId = null;
 function moveBoardStage(id, stage) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  // Moving Inquiries/Approved → Ready to Schedule: ask whether a permit is required first
+  // Moving Inquiries/Approved → Scheduled: ask whether a permit is required first
   const fromStage = normalizeStage(o.status);
-  if ((fromStage === 'Approved' || fromStage === 'Inquiries') && stage === 'Ready to Schedule') {
+  if ((fromStage === 'Approved' || fromStage === 'Inquiries') && stage === 'Scheduled') {
     permitJobId = id;
     document.getElementById('permit-overlay').style.display = 'flex';
     return; // answerPermit() sets the final stage
@@ -2837,7 +2838,7 @@ function answerPermit(yes) {
   document.getElementById('permit-overlay').style.display = 'none';
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  o.status = yes ? 'Permit Pending' : 'Ready to Schedule';
+  o.status = yes ? 'Permit Pending' : 'Scheduled';
   persistBoardJob(o);
   seenStages[id] = normalizeStage(o.status); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
@@ -2892,9 +2893,9 @@ function njSetType(t) {
   njType = t;
   document.getElementById('nj-type-project').className = (t==='project' ? 'on' : '');
   document.getElementById('nj-type-service').className = (t==='service' ? 'on' : '');
-  // Service calls default to "Ready to Schedule"; projects start at "Inquiries"
+  // Service calls default to "Scheduled"; projects start at "Inquiries"
   const njStage = document.getElementById('nj-stage');
-  if (njStage) njStage.value = (t === 'service') ? 'Ready to Schedule' : 'Inquiries';
+  if (njStage) njStage.value = (t === 'service') ? 'Scheduled' : 'Inquiries';
 }
 function openNewJob() {
   populateBoardDropdowns();
