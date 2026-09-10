@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: sunshadow-mileage-delete-wo -->
+<!-- build: prominent-space-location -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1980,8 +1980,12 @@ function buildPlainEmail(o) {
   b += `Park / Property:  ${o.park||'—'}\n`;
   if (o.spaceLocation) b += `Space / Location: ${o.spaceLocation}\n`;
 
-  if (o.description) {
-    b += `\n${'─'.repeat(40)}\nDESCRIPTION OF WORK\n\n${o.description}\n`;
+  // Always show Description of Work, leading with the space/location so it
+  // stands out and doesn't get missed when the invoice is created.
+  if (o.spaceLocation || o.description) {
+    b += `\n${'─'.repeat(40)}\nDESCRIPTION OF WORK\n\n`;
+    if (o.spaceLocation) b += `>>>> SPACE / LOCATION: ${o.spaceLocation} <<<<\n\n`;
+    if (o.description) b += `${o.description}\n`;
   }
 
   if (matRows.length) {
