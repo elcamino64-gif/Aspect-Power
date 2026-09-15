@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: stage-dropdown-inline -->
+<!-- build: attach-menu-paste -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -241,8 +241,16 @@ textarea{resize:vertical;line-height:1.6}
 .att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
 .att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
-.att-adder{margin-top:10px}
+.att-adder{margin-top:10px;position:relative}
 .att-add-select{-webkit-appearance:none;appearance:none;display:inline-block;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:11px 34px 11px 16px;border-radius:12px;cursor:pointer;font-family:inherit;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%232e97f2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 14px center}
+.att-menu{position:absolute;z-index:20;top:100%;left:0;margin-top:6px;min-width:190px;background:#fff;border:1px solid #e0e0e5;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.14);overflow:hidden;padding:4px}
+.att-menu-item{display:block;font-size:15px;font-weight:500;color:#1d1d1f;padding:11px 14px;border-radius:8px;cursor:pointer}
+.att-menu-item:hover{background:#f2f7fd;color:#2e97f2}
+.att-menu-item input{display:none}
+.att-paste{margin-top:10px;border:1.5px dashed #c7c7cc;border-radius:12px;padding:14px 12px;text-align:center;color:#86868b;font-size:13px;font-weight:500;background:#fafafa;min-height:18px;outline:none;cursor:text}
+.att-paste:empty::before{content:attr(data-ph)}
+.att-paste:focus{border-color:#2e97f2}
+.att-paste.drag{border-color:#2e97f2;background:#eaf4fe;color:#2e97f2}
 .att-empty{font-size:12.5px;color:#c7c7cc;font-style:italic}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
 .lightbox.show{display:flex}
@@ -2800,12 +2808,22 @@ function renderAtt(o, a, editable) {
   return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="openAttachment(${o.id},${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span>${del}</div>`;
 }
 
-// The single "Add attachment" dropdown (choose a category, then pick files).
-function attAdderHtml(id, onchange, inputId, inputOnchange) {
-  const opts = ATT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+// The "Add attachment" control: a dropdown button whose menu items are real
+// <label> file inputs (one per category), plus a paste/drop box.
+// mode is 'job' (full job view, needs id) or 'nj' (New Job sheet).
+function attAdderHtml(mode, id) {
+  const onchangeFor = (cat) => mode === 'job'
+    ? `handleAttachmentPick(event,${id},'${cat}')`
+    : `njHandleAttachmentPick(event,'${cat}')`;
+  const items = ATT_CATS.map(cat =>
+    `<label class="att-menu-item" onclick="event.stopPropagation()"><input type="file" accept="${attAcceptFor(cat)}" multiple onchange="${onchangeFor(cat)};closeAttMenus()"/>${cat}</label>`
+  ).join('');
+  const pasteH = mode === 'job' ? `attJobPaste(event,${id})` : `njAttPaste(event)`;
+  const dropH  = mode === 'job' ? `attJobDrop(event,${id})`  : `njAttDrop(event)`;
   return `<div class="att-adder">
-      <select class="att-add-select" onchange="${onchange}"><option value="">📎 Add attachment…</option>${opts}</select>
-      <input type="file" id="${inputId}" accept="${ATT_ACCEPT_ALL}" multiple style="display:none" onchange="${inputOnchange}"/>
+      <button type="button" class="att-add-select" onclick="toggleAttMenu(event,this)">📎 Add attachment…</button>
+      <div class="att-menu" hidden>${items}</div>
+      <div class="att-paste" contenteditable="true" data-ph="📋 Right-click ▸ Paste, or drag a file here" onpaste="${pasteH}" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="${dropH}"></div>
     </div>`;
 }
 
@@ -2818,7 +2836,7 @@ function attachmentsHtml(o, editable) {
     h += `<div class="att-cat"><div class="att-cat-label">${cat}</div><div class="att-grid">${items.map(a => renderAtt(o, a, editable)).join('')}</div></div>`;
   });
   if (editable) {
-    h += attAdderHtml(o.id, `pickAttachmentCategory(this,${o.id})`, `att-file-${o.id}`, `handleAttachmentPick(event,${o.id},this.dataset.category)`);
+    h += attAdderHtml('job', o.id);
   } else if (!atts.length) {
     h += `<div class="att-empty">No attachments yet. Tap Edit to add.</div>`;
   }
@@ -2876,19 +2894,48 @@ async function fileToAttachment(file, category, idBump) {
   }
 }
 
-// Chose a category from the "Add attachment" dropdown → open the file picker
-// for that category (Pictures shows photos only), remembering the category on
-// the hidden input so the pick handler knows where the files belong.
-function pickAttachmentCategory(sel, id) {
-  const cat = sel.value;
-  sel.value = ''; // reset so the same category can be chosen again next time
-  if (!cat) return;
-  const input = document.getElementById('att-file-' + id);
-  if (!input) return;
-  input.dataset.category = cat;
-  input.accept = attAcceptFor(cat);
-  input.click();
+// The "Add attachment" dropdown is a button + a menu of real <label> file
+// inputs (one per category). Clicking a label opens the file dialog natively —
+// this is a reliable user gesture on every browser, unlike calling input.click()
+// from a <select> change (which some browsers, esp. Safari, silently ignore).
+function toggleAttMenu(e, btn) {
+  e.stopPropagation();
+  const menu = btn.parentElement.querySelector('.att-menu');
+  const wasOpen = menu && !menu.hidden;
+  closeAttMenus();
+  if (menu && !wasOpen) menu.hidden = false;
 }
+function closeAttMenus() { document.querySelectorAll('.att-menu').forEach(m => m.hidden = true); }
+document.addEventListener('click', closeAttMenus);
+
+// ── Shared attach helpers (used by browse, paste, and drag-drop) ──
+function clipboardFiles(cd) {
+  const files = [];
+  if (!cd) return files;
+  if (cd.items) { for (const it of cd.items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } } }
+  if (!files.length && cd.files) { for (const f of cd.files) files.push(f); }
+  return files;
+}
+function dtFiles(dt) { const files = []; if (dt && dt.files) { for (const f of dt.files) files.push(f); } return files; }
+// Pasted/dropped items file themselves under Pictures (images) or Other.
+function autoCat(file) { return (file.type && file.type.indexOf('image/') === 0) ? 'Pictures' : 'Other'; }
+async function attachFilesToJob(files, id) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  if (!Array.isArray(o.attachments)) o.attachments = [];
+  for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) o.attachments.push(att); }
+  persistBoardJob(o);
+  refreshBoardViews();
+}
+async function attachFilesToNewJob(files) {
+  for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) njAttachments.push(att); }
+  njRenderAttachments();
+}
+// Right-click ▸ Paste, or drag a file onto the paste box.
+function attJobPaste(e, id) { e.preventDefault(); e.stopPropagation(); const box = e.currentTarget; const f = clipboardFiles(e.clipboardData); if (box) box.textContent = ''; if (f.length) attachFilesToJob(f, id); }
+function attJobDrop(e, id) { e.preventDefault(); e.stopPropagation(); if (e.currentTarget) e.currentTarget.classList.remove('drag'); const f = dtFiles(e.dataTransfer); if (f.length) attachFilesToJob(f, id); }
+function njAttPaste(e) { e.preventDefault(); e.stopPropagation(); const box = e.currentTarget; const f = clipboardFiles(e.clipboardData); if (box) box.textContent = ''; if (f.length) attachFilesToNewJob(f); }
+function njAttDrop(e) { e.preventDefault(); e.stopPropagation(); if (e.currentTarget) e.currentTarget.classList.remove('drag'); const f = dtFiles(e.dataTransfer); if (f.length) attachFilesToNewJob(f); }
 
 async function handleAttachmentPick(ev, id, category) {
   const files = ev.target.files ? Array.from(ev.target.files) : [];
@@ -2911,29 +2958,16 @@ async function handleAttachmentPick(ev, id, category) {
 // pasted items into whichever attachment area is open: the New Job sheet, or
 // the full job view. Text pastes (no files) are left untouched.
 async function handleGlobalPaste(e) {
-  const cd = e.clipboardData;
-  if (!cd) return;
-  const files = [];
-  if (cd.items) { for (const it of cd.items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } } }
-  if (!files.length && cd.files) { for (const f of cd.files) files.push(f); }
+  const files = clipboardFiles(e.clipboardData);
   if (!files.length) return; // nothing pasteable as an attachment; leave text paste alone
   const njOverlay = document.getElementById('nj-overlay');
   const njOpen = njOverlay && njOverlay.classList.contains('show');
   const bjScreen = document.getElementById('screen-boardjob');
-  const bjActive = bjScreen && bjScreen.classList.contains('active');
-  if (!njOpen && !bjActive) return; // no attachment context open — don't hijack the paste
+  const bjActive = bjScreen && bjScreen.classList.contains('active') && boardJobEditMode;
+  if (!njOpen && !bjActive) return; // no editable attachment context open — don't hijack the paste
   e.preventDefault();
-  if (njOpen) {
-    for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], 'Other', k); if (att) njAttachments.push(att); }
-    njRenderAttachments();
-  } else {
-    const o = boardJobs.find(x => x.id === currentBoardJobId);
-    if (!o) return;
-    if (!Array.isArray(o.attachments)) o.attachments = [];
-    for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], 'Other', k); if (att) o.attachments.push(att); }
-    persistBoardJob(o);
-    refreshBoardViews();
-  }
+  if (njOpen) attachFilesToNewJob(files);
+  else attachFilesToJob(files, currentBoardJobId);
 }
 document.addEventListener('paste', handleGlobalPaste);
 
@@ -3351,18 +3385,8 @@ function njRenderAttachments() {
     }).join('');
     h += `<div class="att-cat"><div class="att-cat-label">${cat}</div><div class="att-grid">${grid}</div></div>`;
   });
-  h += attAdderHtml('nj', 'njPickAttachmentCategory(this)', 'nj-att-file', 'njHandleAttachmentPick(event,this.dataset.category)');
+  h += attAdderHtml('nj');
   el.innerHTML = h;
-}
-function njPickAttachmentCategory(sel) {
-  const cat = sel.value;
-  sel.value = '';
-  if (!cat) return;
-  const input = document.getElementById('nj-att-file');
-  if (!input) return;
-  input.dataset.category = cat;
-  input.accept = attAcceptFor(cat);
-  input.click();
 }
 async function njHandleAttachmentPick(ev, category) {
   category = category || 'Other';
