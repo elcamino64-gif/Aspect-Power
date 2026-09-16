@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: sched-visible-compact -->
+<!-- build: sched-sort-soonest -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3069,11 +3069,11 @@ function renderBoard() {
   const visible = boardJobs.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
   canvas.innerHTML = STAGES.map(stage => {
     const cards = visible.filter(o => normalizeStage(o.status) === stage.name)
-      // Sort by Scheduled For, most recent date at the top; undated jobs last.
+      // Sort by Scheduled For, soonest date at the top; undated jobs last.
       .sort((a,b) => {
         const da = a.scheduledDate || '', db = b.scheduledDate || '';
-        if (da && db) return db < da ? -1 : (db > da ? 1 : 0); // YYYY-MM-DD, descending
-        if (da && !db) return -1;
+        if (da && db) return da < db ? -1 : (da > db ? 1 : 0); // YYYY-MM-DD, ascending (soonest first)
+        if (da && !db) return -1; // scheduled jobs sit above undated ones
         if (!da && db) return 1;
         return 0;
       });
@@ -3237,6 +3237,9 @@ function editBoardJobField(id, field, value) {
     upsertPropertyContact(o.park, { name: o.contact, title: o.contactTitle, phone: o.contactPhone, email: o.contactEmail });
   }
   if (field === 'type' || field === 'park') showBoardJob(id); // refresh the shown address/contact for the new property
+  // A changed schedule date re-sorts its column (soonest first), so refresh the
+  // board if it happens to be showing.
+  if (field === 'scheduledDate') refreshBoardViews();
 }
 // Swap the "Tap to set a scheduled date" button for a real date picker.
 function revealScheduleInput(id) {
