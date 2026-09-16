@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: attach-menu-paste -->
+<!-- build: sched-visible-compact -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -123,10 +123,12 @@ textarea{resize:vertical;line-height:1.6}
 #board-canvas{position:absolute;top:0;left:0;transform-origin:top left;display:flex;gap:12px;padding:12px 16px 24px;align-items:flex-start;will-change:transform;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .board-col{flex:0 0 300px;width:300px;max-width:300px;display:flex;flex-direction:column}
 .board-card-space{font-size:12px;color:#86868b;margin-top:2px}
-/* Zoomed-out overview: show only property, space #, and description */
-#board-canvas.compact .board-card-meta,
+/* Zoomed-out overview: hide the expanded detail, but keep the scheduled date
+   visible (enlarged so it stays legible when the board is scaled down). */
 #board-canvas.compact .board-detail{display:none}
 #board-canvas.compact .board-card{padding:10px 11px}
+#board-canvas.compact .board-card-meta{margin-top:7px}
+#board-canvas.compact .board-sched{font-size:20px}
 @media (orientation:landscape){
   #screen-board.active{max-width:none}
 }
