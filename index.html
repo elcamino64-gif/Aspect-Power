@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: calendar-events -->
+<!-- build: auto-scheduled-stage -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3536,6 +3536,12 @@ function editBoardJobField(id, field, value) {
   if (field === 'total') o.total = parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
   else o[field] = value;
   if (field === 'contactTitle') addTitleOption(value);
+  // Assigning a scheduled date automatically moves the job into the Scheduled
+  // stage (from wherever it currently sits). Clearing the date leaves it be.
+  if (field === 'scheduledDate' && value && normalizeStage(o.status) !== 'Scheduled') {
+    o.status = 'Scheduled';
+    seenStages[id] = 'Scheduled'; saveSeenStages(); // scheduler has "seen" this change
+  }
   persistBoardJob(o);
   // Remember this job's contact on the property directory automatically, so it
   // carries to future jobs at the same property.
@@ -3924,13 +3930,15 @@ function saveNewJob() {
   if (!park) { alert('Please choose a Park / Property.'); return; }
   const today = new Date();
   const dateStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  const stage = document.getElementById('nj-stage').value || 'Inquiries';
+  const njSchedVal = document.getElementById('nj-sched').value || '';
+  // A new job created with a scheduled date starts in the Scheduled stage.
+  const stage = njSchedVal ? 'Scheduled' : (document.getElementById('nj-stage').value || 'Inquiries');
   const job = {
     id: Date.now(), date: dateStr, by, park,
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
     status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
-    scheduledDate: document.getElementById('nj-sched').value || '',
+    scheduledDate: njSchedVal,
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
     contactTitle: document.getElementById('nj-contact-title').value.trim(),
