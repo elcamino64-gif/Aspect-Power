@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: calendar-tab -->
+<!-- build: calendar-scroll -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -284,6 +284,9 @@ textarea{resize:vertical;line-height:1.6}
 .cal-li-sub{font-size:12.5px;color:#86868b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cal-li-stage{font-size:11px;font-weight:700;flex-shrink:0;text-align:right}
 .cal-empty{font-size:13px;color:#86868b;font-style:italic;padding:2px}
+.cal-month{border-top:8px solid #f0f0f2}
+.cal-month:first-child{border-top:none}
+.cal-month-title{font-size:16px;font-weight:800;color:#1d1d1f;padding:14px 14px 8px;background:#fff}
 </style>
 </head>
 <body>
@@ -519,12 +522,18 @@ textarea{resize:vertical;line-height:1.6}
     </div>
   </div>
   <div class="cal-bar">
-    <button class="cal-nav" onclick="calPrevMonth()">‹</button>
-    <span class="cal-title" id="cal-title"></span>
-    <button class="cal-nav" onclick="calNextMonth()">›</button>
+    <span class="cal-title" id="cal-title">Calendar</span>
     <button class="cal-today" onclick="calToday()">Today</button>
   </div>
   <div class="scroll" id="cal-content"></div>
+</div>
+
+<!-- Calendar day detail sheet -->
+<div id="cal-day-overlay" class="overlay" onclick="if(event.target===this)closeCalDay()">
+  <div class="sheet">
+    <div class="sheet-head"><b id="cal-day-title"></b><button onclick="closeCalDay()">Done</button></div>
+    <div class="sheet-body" id="cal-day-body"></div>
+  </div>
 </div>
 
 <!-- BOARD JOB DETAIL SCREEN -->
@@ -2804,7 +2813,7 @@ function showBoard() {
 const CAL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const CAL_WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const CAL_WD_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-let calYear, calMonth, calSelected = null; // calSelected: 'YYYY-MM-DD' or null
+let calScrollBound = false;
 
 function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 
@@ -2837,30 +2846,55 @@ function constructionHolidays(year) {
 function showCalendar() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-calendar').classList.add('active');
-  if (calYear == null) { const t = new Date(); calYear = t.getFullYear(); calMonth = t.getMonth(); }
   renderCalendar();
+  scrollCalToCurrent();
+  if (!calScrollBound) {
+    const el = document.getElementById('cal-content');
+    if (el) { el.addEventListener('scroll', calUpdateStickyTitle); calScrollBound = true; }
+  }
 }
-function calPrevMonth() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } calSelected = null; renderCalendar(); }
-function calNextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } calSelected = null; renderCalendar(); }
-function calToday() { const t = new Date(); calYear = t.getFullYear(); calMonth = t.getMonth(); calSelected = ymd(t); renderCalendar(); }
-function calSelectDay(ds) { calSelected = ds; renderCalendar(); }
+function calToday() { scrollCalToCurrent(); }
+function scrollCalToCurrent() {
+  const el = document.getElementById('cal-content');
+  const t = new Date();
+  const m = document.getElementById('cal-m-' + t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0'));
+  if (el && m) { el.scrollTop += m.getBoundingClientRect().top - el.getBoundingClientRect().top; calUpdateStickyTitle(); }
+}
+// Keep the top bar showing whichever month is at the top of the scroll.
+function calUpdateStickyTitle() {
+  const el = document.getElementById('cal-content'); if (!el) return;
+  const top = el.getBoundingClientRect().top;
+  let label = null;
+  el.querySelectorAll('.cal-month').forEach(mo => { if (mo.getBoundingClientRect().top - top <= 6) label = mo.dataset.label; });
+  const t = document.getElementById('cal-title'); if (t && label) t.textContent = label;
+}
+// Tapping a day opens a detail sheet (works from any scroll position).
+function openCalDay(ds) {
+  const [Y, Mo, D] = ds.split('-').map(Number);
+  const dt = new Date(Y, Mo-1, D);
+  document.getElementById('cal-day-title').textContent = `${CAL_WD_FULL[dt.getDay()]}, ${CAL_MONTHS[Mo-1]} ${D}`;
+  const hol = constructionHolidays(Y)[ds];
+  const jobs = calJobsOn(ds);
+  const body = (hol ? `<div class="cal-daylist-hol">🏗️ ${escHtml(hol)} — typical day off</div>` : '')
+    + (jobs.length ? jobs.map(o =>
+        `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
+          <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}</div>
+          <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
+        </div>`).join('') : '<div class="cal-empty">No jobs scheduled for this day. Schedule one from its job card.</div>');
+  document.getElementById('cal-day-body').innerHTML = body;
+  document.getElementById('cal-day-overlay').classList.add('show');
+}
+function closeCalDay() { document.getElementById('cal-day-overlay').classList.remove('show'); }
 
 function calJobsOn(ds) {
   return boardJobs.filter(o => (o.scheduledDate || '') === ds)
     .sort((a,b) => (a.park||'').localeCompare(b.park||''));
 }
 
-function renderCalendar() {
-  const el = document.getElementById('cal-content');
-  if (!el) return;
-  const y = calYear, m = calMonth;
-  const titleEl = document.getElementById('cal-title');
-  if (titleEl) titleEl.textContent = CAL_MONTHS[m] + ' ' + y;
+function calMonthBlock(y, m, todayStr) {
   const holidays = constructionHolidays(y);
-  const todayStr = ymd(new Date());
   const startPad = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m+1, 0).getDate();
-
   const head = CAL_WD.map(w => `<div class="cal-wd">${w}</div>`).join('');
   let cells = '';
   for (let i = 0; i < startPad; i++) cells += '<div class="cal-day empty"></div>';
@@ -2868,35 +2902,40 @@ function renderCalendar() {
     const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const jobs = calJobsOn(ds);
     const hol = holidays[ds];
-    const cls = 'cal-day' + (ds === todayStr ? ' today' : '') + (ds === calSelected ? ' sel' : '') + (hol ? ' holiday' : '');
+    const cls = 'cal-day' + (ds === todayStr ? ' today' : '') + (hol ? ' holiday' : '');
     const holHtml = hol ? `<div class="cal-hol" title="${escHtml(hol)}">🏗️ ${escHtml(hol)}</div>` : '';
     const chips = jobs.slice(0, 3).map(o =>
       `<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')">${escHtml(o.park||'—')}</div>`
     ).join('');
     const more = jobs.length > 3 ? `<div class="cal-more">+${jobs.length-3} more</div>` : '';
-    cells += `<div class="${cls}" onclick="calSelectDay('${ds}')"><div class="cal-dnum">${d}</div>${holHtml}${chips}${more}</div>`;
+    cells += `<div class="${cls}" onclick="openCalDay('${ds}')"><div class="cal-dnum">${d}</div>${holHtml}${chips}${more}</div>`;
   }
-
-  let dayList = '';
-  if (calSelected) {
-    const [Y, Mo, D] = calSelected.split('-').map(Number);
-    const dt = new Date(Y, Mo-1, D);
-    const label = `${CAL_WD_FULL[dt.getDay()]}, ${CAL_MONTHS[Mo-1]} ${D}, ${Y}`;
-    const hol = constructionHolidays(Y)[calSelected];
-    const jobs = calJobsOn(calSelected);
-    dayList = `<div class="cal-daylist"><div class="cal-daylist-h">${label}</div>`
-      + (hol ? `<div class="cal-daylist-hol">🏗️ ${escHtml(hol)} — typical day off</div>` : '')
-      + (jobs.length ? jobs.map(o =>
-          `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="showBoardJob(${o.id},'calendar')">
-            <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}</div>
-            <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
-          </div>`
-        ).join('') : '<div class="cal-empty">No jobs scheduled for this day. Tap a job on the board to schedule one.</div>')
-      + '</div>';
-  } else {
-    dayList = '<div class="cal-daylist"><div class="cal-empty">Tap a day to see its jobs. Tap a job to open its card.</div></div>';
+  const label = CAL_MONTHS[m] + ' ' + y;
+  return `<div class="cal-month" id="cal-m-${y}-${String(m+1).padStart(2,'0')}" data-label="${label}">
+      <div class="cal-month-title">${label}</div>
+      <div class="cal-grid cal-head">${head}</div>
+      <div class="cal-grid cal-body">${cells}</div>
+    </div>`;
+}
+function renderCalendar() {
+  const el = document.getElementById('cal-content');
+  if (!el) return;
+  const prevScroll = el.scrollTop;
+  const todayStr = ymd(new Date());
+  const now = new Date();
+  // Render 2 months back through ~15 months forward for continuous scrolling.
+  let sy = now.getFullYear(), sm = now.getMonth() - 2;
+  while (sm < 0) { sm += 12; sy--; }
+  let html = '';
+  for (let k = 0; k < 18; k++) {
+    const mi = sm + k;
+    const yy = sy + Math.floor(mi / 12);
+    const mm = ((mi % 12) + 12) % 12;
+    html += calMonthBlock(yy, mm, todayStr);
   }
-  el.innerHTML = `<div class="cal-grid cal-head">${head}</div><div class="cal-grid cal-body">${cells}</div>${dayList}`;
+  el.innerHTML = html;
+  el.scrollTop = prevScroll; // keep position across background re-renders
+  calUpdateStickyTitle();
 }
 function setBoardFilter(f) {
   boardFilter = f;
