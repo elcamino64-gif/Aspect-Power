@@ -37,6 +37,8 @@ create table if not exists board_jobs (
 alter table board_jobs add column if not exists attachments jsonb default '[]'::jsonb;
 -- Scheduled-for date on each job (used to sort the board columns).
 alter table board_jobs add column if not exists scheduled_date text;
+-- A job can be scheduled across several days (list of YYYY-MM-DD strings).
+alter table board_jobs add column if not exists scheduled_dates jsonb default '[]'::jsonb;
 
 -- Allow the app (anon key) to read/write, matching the existing tables.
 alter table board_jobs enable row level security;

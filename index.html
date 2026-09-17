@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: cal-events-resilient -->
+<!-- build: multi-date-jobs -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -225,6 +225,12 @@ textarea{resize:vertical;line-height:1.6}
 .bj-edit-btn{flex-shrink:0;margin-top:2px;background:#eaf4fe;color:#2e97f2;border:none;font-size:14px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;font-family:inherit}
 .bj-edit-btn.done{background:#2e97f2;color:#fff}
 .bj-stage-sel{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:14px;font-weight:600;color:#1d1d1f;background:#f5f5f7;border:1px solid #e0e0e5;border-radius:9px;padding:8px 32px 8px 12px;margin-top:2px;cursor:pointer;max-width:100%;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
+.jd-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}
+.jd-chip{display:inline-flex;align-items:center;gap:7px;background:#eaf4fe;color:#1d6fd0;font-size:14px;font-weight:600;padding:7px 8px 7px 11px;border-radius:10px}
+.jd-chip button{background:none;border:none;color:#1d6fd0;font-size:13px;cursor:pointer;padding:0;line-height:1;opacity:0.65;font-family:inherit}
+.jd-chip button:active{opacity:1}
+.jd-add{background:#f5f5f7;border:1px dashed #b9c0cc;color:#334155;font-size:14px;font-weight:600;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit}
+.jd-dateinput{width:auto;padding:6px 8px;margin-left:2px}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 /* Clean read-only grouping (view mode) */
 .bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
@@ -2751,22 +2757,38 @@ function unpackContact(raw){
   } catch(e){}
   return { contact: String(raw), contactTitle:'', contactPhone:'', contactEmail:'' }; // legacy plain-text contact
 }
+// A job can be scheduled for several days. jobDates() reads the full sorted
+// list (falling back to the single legacy scheduledDate); normalizeJobDates()
+// tidies the list and keeps scheduledDate = the earliest day for older code.
+function jobDates(o){
+  let ds = Array.isArray(o.scheduledDates) ? o.scheduledDates : (o.scheduledDate ? [o.scheduledDate] : []);
+  return Array.from(new Set(ds.filter(Boolean))).sort();
+}
+function normalizeJobDates(o){
+  const ds = jobDates(o);
+  o.scheduledDates = ds;
+  o.scheduledDate = ds[0] || '';
+  return ds;
+}
 function jobToRow(j){
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
     location:j.spaceLocation, description:j.description, amount:j.total,
     status_tag:j.statusTag, contact:packContact(j), notes:j.otherNotes,
     checklist:j.checklist, attachments:j.attachments || [],
-    scheduled_date:j.scheduledDate || null };
+    scheduled_date:j.scheduledDate || null, scheduled_dates:jobDates(j) };
 }
 function rowToJob(r){
-  return { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
+  const o = { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
     by:r.technician||'', spaceLocation:r.location||'', description:r.description||'',
     total:parseFloat(r.amount)||0, statusTag:r.status_tag||'',
     ...unpackContact(r.contact),
     otherNotes:r.notes||'', date:r.created_at ? String(r.created_at).slice(0,10) : '',
     scheduledDate:r.scheduled_date || '',
+    scheduledDates:Array.isArray(r.scheduled_dates)?r.scheduled_dates:[],
     checklist:Array.isArray(r.checklist)?r.checklist:[],
     attachments:Array.isArray(r.attachments)?r.attachments:[] };
+  normalizeJobDates(o);
+  return o;
 }
 
 async function loadBoardJobsFromCloud(){
@@ -2795,12 +2817,14 @@ async function saveBoardJobToCloud(job){
     body: JSON.stringify(payload)
   });
   try {
+    // Try the full row, then progressively drop columns an older table may lack
+    // (scheduled_dates, then scheduled_date, then attachments) until one saves.
     const full = jobToRow(job);
-    const { scheduled_date, ...noSched } = full;      // table may lack scheduled_date
-    const { attachments, ...noSchedNoAtt } = noSched; // older table may also lack attachments
-    let res = await post(full);
-    if (!res.ok) res = await post(noSched);
-    if (!res.ok) res = await post(noSchedNoAtt);
+    const a2 = { ...full }; delete a2.scheduled_dates;
+    const a3 = { ...a2 }; delete a3.scheduled_date;
+    const a4 = { ...a3 }; delete a4.attachments;
+    let res;
+    for (const payload of [full, a2, a3, a4]) { res = await post(payload); if (res.ok) break; }
     if (!res.ok) console.warn('saveBoardJobToCloud failed (saved locally):', res.status, await res.text());
   } catch(e) { console.error('saveBoardJobToCloud network error (saved locally):', e); }
 }
@@ -3013,7 +3037,7 @@ function calDeleteEvent(id) {
 }
 
 function calJobsOn(ds) {
-  return boardJobs.filter(o => (o.scheduledDate || '') === ds)
+  return boardJobs.filter(o => jobDates(o).includes(ds))
     .sort((a,b) => (a.park||'').localeCompare(b.park||''));
 }
 
@@ -3083,7 +3107,7 @@ function boardCardHtml(o) {
     </div>
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
-    ${o.scheduledDate?`<div class="board-card-meta"><span class="board-sched">📅 Scheduled ${fmtDate(o.scheduledDate)}</span></div>`:''}
+    ${(()=>{const ds=jobDates(o);return ds.length?`<div class="board-card-meta"><span class="board-sched">📅 ${fmtDate(ds[0])}${ds.length>1?` +${ds.length-1} more`:''}</span></div>`:'';})()}
     ${tagHtml?`<div class="board-card-tagrow">${tagHtml}</div>`:''}
     ${boardDetailHtml(o)}
   </div>`;
@@ -3486,13 +3510,8 @@ function renderBoardJob(id) {
   if (boardJobEditMode) {
     const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
     top = `
-      <label class="fl">Scheduled For</label>
-      ${o.scheduledDate
-        ? `<div style="display:flex;gap:8px;align-items:center">
-             <input type="date" value="${escHtml(o.scheduledDate)}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); if(!this.value) renderBoardJob(${o.id})" style="flex:1"/>
-             <button type="button" class="btn-ghost" style="flex-shrink:0;padding:10px 12px" onclick="editBoardJobField(${o.id},'scheduledDate',''); renderBoardJob(${o.id})">Clear</button>
-           </div>`
-        : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`}
+      <label class="fl">Scheduled Dates</label>
+      ${jobDatesControl(o)}
       <label class="fl">Stage</label>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
       <label class="fl">Job Location</label>
@@ -3510,12 +3529,7 @@ function renderBoardJob(id) {
   } else {
     const row = (l, v, muted) => `<div class="bj-row"><div class="l">${l}</div><div class="v${muted?' muted':''}">${v}</div></div>`;
     // Scheduling is available right here, without tapping Edit.
-    const schedControl = o.scheduledDate
-      ? `<div style="display:flex;gap:8px;align-items:center;margin-top:2px">
-           <input type="date" value="${escHtml(o.scheduledDate)}" onchange="editBoardJobField(${o.id},'scheduledDate',this.value); if(!this.value) renderBoardJob(${o.id})" style="flex:1"/>
-           <button type="button" class="btn-ghost" style="flex-shrink:0;padding:8px 10px" onclick="editBoardJobField(${o.id},'scheduledDate',''); renderBoardJob(${o.id})">Clear</button>
-         </div>`
-      : `<button type="button" class="bj-setdate" id="setdate-${o.id}" onclick="revealScheduleInput(${o.id})">📅 Tap to set a scheduled date</button>`;
+    const schedControl = jobDatesControl(o);
     // Stage is changeable right here, without tapping Edit.
     const stageControl = `<select class="bj-stage-sel" onchange="moveBoardStage(${o.id}, this.value)">${STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('')}</select>`;
     top = `
@@ -3570,17 +3584,54 @@ function editBoardJobField(id, field, value) {
   // board if it happens to be showing.
   if (field === 'scheduledDate') refreshBoardViews();
 }
-// Swap the "Tap to set a scheduled date" button for a real date picker.
-function revealScheduleInput(id) {
-  const btn = document.getElementById('setdate-' + id);
+// Multi-date scheduling control: shows each assigned day as a removable chip,
+// with a button to add another day. Used in both the locked and edit views.
+function jobDatesControl(o) {
+  const ds = jobDates(o);
+  if (!ds.length) {
+    return `<button type="button" class="bj-setdate" id="jdadd-${o.id}" onclick="addJobDate(${o.id})">📅 Tap to set a scheduled date</button>`;
+  }
+  const chips = ds.map(d =>
+    `<span class="jd-chip">${fmtDate(d)}<button type="button" title="Remove this day" onclick="event.stopPropagation();removeJobDate(${o.id},'${d}')">✕</button></span>`
+  ).join('');
+  return `<div class="jd-wrap">${chips}<button type="button" class="jd-add" id="jdadd-${o.id}" onclick="addJobDate(${o.id})">＋ Add a day</button></div>`;
+}
+// Reveal a date picker next to the add button; chosen day is added to the job.
+function addJobDate(id) {
+  const btn = document.getElementById('jdadd-' + id);
   if (!btn) return;
   const inp = document.createElement('input');
   inp.type = 'date';
-  inp.style.width = '100%';
-  inp.onchange = () => { editBoardJobField(id, 'scheduledDate', inp.value); renderBoardJob(id); };
-  btn.replaceWith(inp);
+  inp.className = 'jd-dateinput';
+  inp.onchange = () => { if (inp.value) addJobScheduledDate(id, inp.value); else renderBoardJob(id); };
+  btn.insertAdjacentElement('afterend', inp);
   inp.focus();
   if (inp.showPicker) { try { inp.showPicker(); } catch(e){} }
+}
+function addJobScheduledDate(id, ds) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  const list = jobDates(o);
+  if (!list.includes(ds)) list.push(ds);
+  o.scheduledDates = list;
+  normalizeJobDates(o);
+  // Assigning a day moves the job into Scheduled (from wherever it is).
+  if (normalizeStage(o.status) !== 'Scheduled') {
+    o.status = 'Scheduled';
+    seenStages[id] = 'Scheduled'; saveSeenStages();
+  }
+  persistBoardJob(o);
+  refreshBoardViews();
+  renderBoardJob(id);
+}
+function removeJobDate(id, ds) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  o.scheduledDates = jobDates(o).filter(d => d !== ds);
+  normalizeJobDates(o);
+  persistBoardJob(o);
+  refreshBoardViews();
+  renderBoardJob(id);
 }
 // Edit the property's address from a job — saved to the property directory
 // (shared by every job at that property).
@@ -3954,7 +4005,7 @@ function saveNewJob() {
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
     status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
-    scheduledDate: njSchedVal,
+    scheduledDate: njSchedVal, scheduledDates: njSchedVal ? [njSchedVal] : [],
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
     contactTitle: document.getElementById('nj-contact-title').value.trim(),
