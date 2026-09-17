@@ -147,3 +147,22 @@ drop policy if exists categories_all on categories;
 create policy categories_all on categories for all using (true) with check (true);
 grant all on categories to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Calendar events: personal items you add to the Calendar by tapping a day
+-- (birthdays, days off, reminders). Separate from jobs. Run this once so the
+-- events sync across every device. Locked to signed-in users only.
+-- ---------------------------------------------------------------------------
+create table if not exists calendar_events (
+  id         bigint primary key,
+  date       text,
+  title      text,
+  note       text,
+  created_at timestamptz default now()
+);
+alter table calendar_events enable row level security;
+drop policy if exists calendar_events_all on calendar_events;
+drop policy if exists calendar_events_authed on calendar_events;
+create policy calendar_events_authed on calendar_events
+  for all to authenticated using (true) with check (true);
+grant all on calendar_events to anon, authenticated;

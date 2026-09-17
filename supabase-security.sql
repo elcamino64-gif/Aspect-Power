@@ -25,7 +25,7 @@ declare t text;
 begin
   foreach t in array array[
     'work_orders','properties','technicians','materials_db','categories',
-    'board_jobs','property_directory'
+    'board_jobs','property_directory','calendar_events'
   ] loop
     execute format('alter table %I enable row level security;', t);
     execute format('drop policy if exists %I on %I;', t||'_all', t);
@@ -45,7 +45,7 @@ end $$;
 -- begin
 --   foreach t in array array[
 --     'work_orders','properties','technicians','materials_db','categories',
---     'board_jobs','property_directory'
+--     'board_jobs','property_directory','calendar_events'
 --   ] loop
 --     execute format('drop policy if exists %I on %I;', t||'_authed', t);
 --     execute format('drop policy if exists %I on %I;', t||'_all', t);

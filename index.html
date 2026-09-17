@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: cal-landscape-safearea -->
+<!-- build: calendar-events -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -289,6 +289,15 @@ textarea{resize:vertical;line-height:1.6}
 .cal-li-sub{font-size:12.5px;color:#86868b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cal-li-stage{font-size:11px;font-weight:700;flex-shrink:0;text-align:right}
 .cal-empty{font-size:13px;color:#86868b;font-style:italic;padding:2px}
+.cal-chip.cal-ev{background:#475569}
+.cal-ev-li{display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e5e5ea;border-left:4px solid #475569;border-radius:12px;padding:11px 13px;margin-bottom:9px}
+.cal-ev-li-main{flex:1;min-width:0;cursor:pointer}
+.cal-ev-li-title{font-size:15px;font-weight:700;color:#1d1d1f}
+.cal-ev-del{flex-shrink:0;width:28px;height:28px;border-radius:50%;border:none;background:#fee2e2;color:#dc2626;font-size:14px;cursor:pointer;font-family:inherit;line-height:1}
+.cal-add-ev{width:100%;margin-top:6px;border:1.5px dashed #475569;background:transparent;color:#334155;font-size:15px;font-weight:600;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit}
+.cal-ev-form{display:flex;flex-direction:column}
+.cal-ev-save{width:100%;margin-top:14px;background:#2e97f2;color:#fff;border:none;font-size:16px;font-weight:600;padding:13px;border-radius:12px;cursor:pointer;font-family:inherit}
+.cal-ev-cancel{width:100%;margin-top:8px;background:transparent;color:#86868b;border:none;font-size:14px;font-weight:600;padding:8px;cursor:pointer;font-family:inherit}
 .cal-month{border-top:8px solid #f0f0f2}
 .cal-month:first-child{border-top:none}
 .cal-month-title{font-size:16px;font-weight:800;color:#1d1d1f;padding:14px 14px 8px;background:#fff}
@@ -2801,6 +2810,37 @@ async function deleteBoardJobFromCloud(id){
 }
 function persistBoardJob(job){ saveBoardJobsLocal(); saveBoardJobToCloud(job); }
 
+// ── Calendar events (birthdays, days off, reminders — separate from jobs) ──
+let calEvents = [];
+try { calEvents = JSON.parse(localStorage.getItem('calEvents') || '[]'); } catch(e){}
+function saveCalEventsLocal(){ try { localStorage.setItem('calEvents', JSON.stringify(calEvents)); } catch(e){} }
+function calEventsOn(ds){ return calEvents.filter(e => (e.date||'') === ds).sort((a,b)=>(a.title||'').localeCompare(b.title||'')); }
+async function loadCalEventsFromCloud(){
+  try {
+    const rows = await sbFetch('calendar_events?order=created_at.desc');
+    if (rows && rows.length !== undefined) {
+      calEvents = rows.map(r => ({ id:r.id, date:r.date||'', title:r.title||'', note:r.note||'' }));
+      saveCalEventsLocal();
+    }
+  } catch(e) { console.error('loadCalEventsFromCloud failed (using local):', e); }
+  if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
+}
+async function saveCalEventToCloud(ev){
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/calendar_events', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + bearer(),
+        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ id: ev.id, date: ev.date, title: ev.title, note: ev.note })
+    });
+    if (!res.ok) console.warn('saveCalEventToCloud failed (saved locally):', res.status, await res.text());
+  } catch(e) { console.error('saveCalEventToCloud network error (saved locally):', e); }
+}
+async function deleteCalEventFromCloud(id){
+  try { await sbFetch('calendar_events?id=eq.' + id, { method: 'DELETE', prefer: 'return=minimal' }); }
+  catch(e) { console.error('deleteCalEventFromCloud error:', e); }
+}
+
 function updateBoardCount(){
   const el = document.getElementById('board-count');
   if (el) el.textContent = boardJobs.length + ' job' + (boardJobs.length !== 1 ? 's' : '');
@@ -2888,23 +2928,73 @@ function calUpdateStickyTitle() {
   el.querySelectorAll('.cal-month').forEach(mo => { if (mo.getBoundingClientRect().top - top <= 6) label = mo.dataset.label; });
   const t = document.getElementById('cal-title'); if (t && label) t.textContent = label;
 }
-// Tapping a day opens a detail sheet (works from any scroll position).
+// Tapping a day opens a detail sheet: events you add, plus any jobs/holiday.
+let calDaySheetDate = null;
 function openCalDay(ds) {
+  calDaySheetDate = ds;
+  calRenderDaySheet();
+  document.getElementById('cal-day-overlay').classList.add('show');
+}
+function closeCalDay() { document.getElementById('cal-day-overlay').classList.remove('show'); }
+function calRenderDaySheet() {
+  const ds = calDaySheetDate;
   const [Y, Mo, D] = ds.split('-').map(Number);
   const dt = new Date(Y, Mo-1, D);
   document.getElementById('cal-day-title').textContent = `${CAL_WD_FULL[dt.getDay()]}, ${CAL_MONTHS[Mo-1]} ${D}`;
   const hol = constructionHolidays(Y)[ds];
+  const evs = calEventsOn(ds);
   const jobs = calJobsOn(ds);
-  const body = (hol ? `<div class="cal-daylist-hol">🏗️ ${escHtml(hol)} — typical day off</div>` : '')
-    + (jobs.length ? jobs.map(o =>
-        `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
-          <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}</div>
-          <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
-        </div>`).join('') : '<div class="cal-empty">No jobs scheduled for this day. Schedule one from its job card.</div>');
-  document.getElementById('cal-day-body').innerHTML = body;
-  document.getElementById('cal-day-overlay').classList.add('show');
+  let b = (hol ? `<div class="cal-daylist-hol">🏗️ ${escHtml(hol)} — typical day off</div>` : '');
+  b += evs.map(e =>
+    `<div class="cal-ev-li">
+       <div class="cal-ev-li-main" onclick="calShowEventForm('${e.id}')"><div class="cal-ev-li-title">📌 ${escHtml(e.title||'Event')}</div>${e.note?`<div class="cal-li-sub">${escHtml(e.note)}</div>`:''}</div>
+       <button class="cal-ev-del" onclick="calDeleteEvent('${e.id}')">✕</button>
+     </div>`).join('');
+  b += jobs.map(o =>
+      `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
+        <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}</div>
+        <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
+      </div>`).join('');
+  if (!evs.length && !jobs.length && !hol) b += '<div class="cal-empty">Nothing on this day yet.</div>';
+  b += `<button class="cal-add-ev" onclick="calShowEventForm(null)">＋ Add event</button>`;
+  document.getElementById('cal-day-body').innerHTML = b;
 }
-function closeCalDay() { document.getElementById('cal-day-overlay').classList.remove('show'); }
+function calShowEventForm(id) {
+  const ev = id ? calEvents.find(e => String(e.id) === String(id)) : null;
+  document.getElementById('cal-day-body').innerHTML = `
+    <div class="cal-ev-form">
+      <label class="fl">Title</label>
+      <input id="cal-ev-title" type="text" placeholder="e.g. Troy's birthday (not working)" value="${ev?escHtml(ev.title):''}"/>
+      <label class="fl">Note (optional)</label>
+      <textarea id="cal-ev-note" rows="2" placeholder="Any details...">${ev?escHtml(ev.note||''):''}</textarea>
+      <button class="cal-ev-save" onclick="calSaveEventFromForm(${ev?`'${ev.id}'`:'null'})">${ev?'Save changes':'Add to calendar'}</button>
+      <button class="cal-ev-cancel" onclick="calRenderDaySheet()">Cancel</button>
+    </div>`;
+  const t = document.getElementById('cal-ev-title'); if (t) t.focus();
+}
+function calSaveEventFromForm(id) {
+  const title = (document.getElementById('cal-ev-title').value || '').trim();
+  const note = (document.getElementById('cal-ev-note').value || '').trim();
+  if (!title) { alert('Please enter a title for the event.'); return; }
+  if (id) {
+    const ev = calEvents.find(e => String(e.id) === String(id));
+    if (ev) { ev.title = title; ev.note = note; saveCalEventsLocal(); saveCalEventToCloud(ev); }
+  } else {
+    const ev = { id: Date.now(), date: calDaySheetDate, title, note };
+    calEvents.push(ev); saveCalEventsLocal(); saveCalEventToCloud(ev);
+  }
+  calRenderDaySheet();
+  renderCalendar();
+}
+function calDeleteEvent(id) {
+  if (!confirm('Delete this event?')) return;
+  const ev = calEvents.find(e => String(e.id) === String(id));
+  calEvents = calEvents.filter(e => String(e.id) !== String(id));
+  saveCalEventsLocal();
+  if (ev) deleteCalEventFromCloud(ev.id);
+  calRenderDaySheet();
+  renderCalendar();
+}
 
 function calJobsOn(ds) {
   return boardJobs.filter(o => (o.scheduledDate || '') === ds)
@@ -2921,13 +3011,16 @@ function calMonthBlock(y, m, todayStr) {
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const jobs = calJobsOn(ds);
+    const evs = calEventsOn(ds);
     const hol = holidays[ds];
     const cls = 'cal-day' + (ds === todayStr ? ' today' : '') + (hol ? ' holiday' : '');
     const holHtml = hol ? `<div class="cal-hol" title="${escHtml(hol)}">🏗️ ${escHtml(hol)}</div>` : '';
-    const chips = jobs.slice(0, 3).map(o =>
-      `<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')">${escHtml(o.park||'—')}</div>`
-    ).join('');
-    const more = jobs.length > 3 ? `<div class="cal-more">+${jobs.length-3} more</div>` : '';
+    // Events (personal items) first, then jobs — capped at 3 chips per day.
+    const chipEls = [];
+    evs.forEach(e => chipEls.push(`<div class="cal-chip cal-ev" title="${escHtml(e.title||'')}" onclick="event.stopPropagation();openCalDay('${ds}')">📌 ${escHtml(e.title||'Event')}</div>`));
+    jobs.forEach(o => chipEls.push(`<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')">${escHtml(o.park||'—')}</div>`));
+    const chips = chipEls.slice(0, 3).join('');
+    const more = chipEls.length > 3 ? `<div class="cal-more">+${chipEls.length-3} more</div>` : '';
     cells += `<div class="${cls}" onclick="openCalDay('${ds}')"><div class="cal-dnum">${d}</div>${holHtml}${chips}${more}</div>`;
   }
   const label = CAL_MONTHS[m] + ' ' + y;
@@ -3915,6 +4008,7 @@ function initApp() {
   (async () => {
     await loadPropertyInfoFromCloud();
     await loadBoardJobsFromCloud();
+    await loadCalEventsFromCloud();
     reconcileContacts();
     if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   })();
