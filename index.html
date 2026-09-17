@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: sched-sort-soonest -->
+<!-- build: calendar-tab -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -258,6 +258,32 @@ textarea{resize:vertical;line-height:1.6}
 .lightbox.show{display:flex}
 .lightbox img{max-width:100%;max-height:90vh;border-radius:8px}
 .lightbox-close{position:absolute;top:16px;right:20px;color:#fff;font-size:34px;background:none;border:none;cursor:pointer;line-height:1}
+/* Calendar */
+.cal-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid #e5e5ea}
+.cal-title{flex:1;text-align:center;font-size:17px;font-weight:800;color:#1d1d1f}
+.cal-nav{width:34px;height:34px;border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:18px;font-weight:700;border-radius:9px;cursor:pointer;font-family:inherit;line-height:1;flex-shrink:0}
+.cal-today{border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:13px;font-weight:600;padding:8px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-wd{text-align:center;font-size:10.5px;font-weight:700;color:#86868b;padding:7px 0;text-transform:uppercase;letter-spacing:0.3px}
+.cal-head{border-bottom:1px solid #e5e5ea;background:#fafafa}
+.cal-day{min-height:82px;border-right:1px solid #f0f0f2;border-bottom:1px solid #f0f0f2;padding:4px 4px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer;overflow:hidden;background:#fff}
+.cal-day.empty{background:#fafafa;cursor:default}
+.cal-day.holiday{background:#fff6f4}
+.cal-dnum{font-size:12px;font-weight:600;color:#3a3a3c;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0}
+.cal-day.today .cal-dnum{background:#2e97f2;color:#fff}
+.cal-day.sel{outline:2px solid #2e97f2;outline-offset:-2px}
+.cal-chip{font-size:10px;font-weight:600;color:#fff;background:var(--c,#888);border-radius:4px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;line-height:1.35}
+.cal-more{font-size:9px;color:#86868b;font-weight:600;padding-left:2px}
+.cal-hol{font-size:9px;font-weight:700;color:#e5484d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.cal-daylist{padding:14px 16px 40px}
+.cal-daylist-h{font-size:15px;font-weight:800;color:#1d1d1f;margin-bottom:4px}
+.cal-daylist-hol{font-size:12.5px;font-weight:700;color:#e5484d;margin-bottom:10px}
+.cal-li{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e5e5ea;border-left:4px solid var(--c,#888);border-radius:12px;padding:11px 13px;margin-bottom:9px;cursor:pointer}
+.cal-li-main{flex:1;min-width:0}
+.cal-li-title{font-size:15px;font-weight:700;color:#1d1d1f}
+.cal-li-sub{font-size:12.5px;color:#86868b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-li-stage{font-size:11px;font-weight:700;flex-shrink:0;text-align:right}
+.cal-empty{font-size:13px;color:#86868b;font-style:italic;padding:2px}
 </style>
 </head>
 <body>
@@ -308,6 +334,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="nav-bar">
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
+        <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
         <button class="btn-ghost on" id="btn-to-list" onclick="showList()">Work Orders<span id="order-count" style="display:none"></span></button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
@@ -424,6 +451,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="nav-bar">
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
+        <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
         <button class="btn-ghost on" onclick="showList()">Work Orders</button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
@@ -461,6 +489,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="nav-bar">
       <div class="navtrio">
         <button class="btn-ghost on" onclick="showBoard()">▦ Board</button>
+        <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
         <button class="btn-ghost" onclick="showList()">Work Orders</button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
@@ -476,12 +505,34 @@ textarea{resize:vertical;line-height:1.6}
   <div class="board-scroll" id="board-scroll"><div id="board-sizer"><div id="board-canvas"></div></div></div>
 </div>
 
+<!-- CALENDAR SCREEN -->
+<div id="screen-calendar" class="screen">
+  <div class="header">
+    <div class="logo-bar" data-logo></div>
+    <div class="nav-bar">
+      <div class="navtrio">
+        <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
+        <button class="btn-ghost on" onclick="showCalendar()">📅 Calendar</button>
+        <button class="btn-ghost" onclick="showList()">Work Orders</button>
+        <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
+      </div>
+    </div>
+  </div>
+  <div class="cal-bar">
+    <button class="cal-nav" onclick="calPrevMonth()">‹</button>
+    <span class="cal-title" id="cal-title"></span>
+    <button class="cal-nav" onclick="calNextMonth()">›</button>
+    <button class="cal-today" onclick="calToday()">Today</button>
+  </div>
+  <div class="scroll" id="cal-content"></div>
+</div>
+
 <!-- BOARD JOB DETAIL SCREEN -->
 <div id="screen-boardjob" class="screen">
   <div class="header">
     <div class="logo-bar" data-logo></div>
     <div class="nav-bar">
-      <button class="btn-ghost" onclick="showBoard()">← Board</button>
+      <button class="btn-ghost" onclick="backFromBoardJob()">← Back</button>
       <span class="status-badge" id="boardjob-status-badge"></span>
     </div>
   </div>
@@ -495,6 +546,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="nav-bar">
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
+        <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
         <button class="btn-ghost" onclick="showList()">Work Orders</button>
         <button class="btn-ghost on" onclick="showContacts()">📇 Contacts</button>
       </div>
@@ -2693,6 +2745,7 @@ async function loadBoardJobsFromCloud(){
   }
   ensureSeenBaseline(ok);
   if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
+  if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
   updateBoardCount();
 }
 
@@ -2745,6 +2798,105 @@ function showBoard() {
   document.getElementById('screen-board').classList.add('active');
   updateBoardCount();
   renderBoard();
+}
+
+// ── Calendar ───────────────────────────────────────────────
+const CAL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const CAL_WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const CAL_WD_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+let calYear, calMonth, calSelected = null; // calSelected: 'YYYY-MM-DD' or null
+
+function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+// nth (1-based) weekday in a month; weekday 0=Sun, month 0-based
+function calNthWeekday(year, month, weekday, n) {
+  const first = new Date(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  return new Date(year, month, 1 + offset + (n-1)*7);
+}
+function calLastWeekday(year, month, weekday) {
+  const last = new Date(year, month+1, 0);
+  const offset = (last.getDay() - weekday + 7) % 7;
+  return new Date(year, month, last.getDate() - offset);
+}
+// Typical construction industry paid holidays for a given year.
+function constructionHolidays(year) {
+  const map = {};
+  const add = (d, name) => { map[ymd(d)] = name; };
+  add(new Date(year, 0, 1), "New Year's Day");
+  add(calLastWeekday(year, 4, 1), 'Memorial Day');       // last Monday of May
+  add(new Date(year, 6, 4), 'Independence Day');
+  add(calNthWeekday(year, 8, 1, 1), 'Labor Day');        // 1st Monday of September
+  const thx = calNthWeekday(year, 10, 4, 4);             // 4th Thursday of November
+  add(thx, 'Thanksgiving');
+  add(new Date(year, thx.getMonth(), thx.getDate()+1), 'Day after Thanksgiving');
+  add(new Date(year, 11, 25), 'Christmas Day');
+  return map;
+}
+
+function showCalendar() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-calendar').classList.add('active');
+  if (calYear == null) { const t = new Date(); calYear = t.getFullYear(); calMonth = t.getMonth(); }
+  renderCalendar();
+}
+function calPrevMonth() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } calSelected = null; renderCalendar(); }
+function calNextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } calSelected = null; renderCalendar(); }
+function calToday() { const t = new Date(); calYear = t.getFullYear(); calMonth = t.getMonth(); calSelected = ymd(t); renderCalendar(); }
+function calSelectDay(ds) { calSelected = ds; renderCalendar(); }
+
+function calJobsOn(ds) {
+  return boardJobs.filter(o => (o.scheduledDate || '') === ds)
+    .sort((a,b) => (a.park||'').localeCompare(b.park||''));
+}
+
+function renderCalendar() {
+  const el = document.getElementById('cal-content');
+  if (!el) return;
+  const y = calYear, m = calMonth;
+  const titleEl = document.getElementById('cal-title');
+  if (titleEl) titleEl.textContent = CAL_MONTHS[m] + ' ' + y;
+  const holidays = constructionHolidays(y);
+  const todayStr = ymd(new Date());
+  const startPad = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+
+  const head = CAL_WD.map(w => `<div class="cal-wd">${w}</div>`).join('');
+  let cells = '';
+  for (let i = 0; i < startPad; i++) cells += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const jobs = calJobsOn(ds);
+    const hol = holidays[ds];
+    const cls = 'cal-day' + (ds === todayStr ? ' today' : '') + (ds === calSelected ? ' sel' : '') + (hol ? ' holiday' : '');
+    const holHtml = hol ? `<div class="cal-hol" title="${escHtml(hol)}">🏗️ ${escHtml(hol)}</div>` : '';
+    const chips = jobs.slice(0, 3).map(o =>
+      `<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')">${escHtml(o.park||'—')}</div>`
+    ).join('');
+    const more = jobs.length > 3 ? `<div class="cal-more">+${jobs.length-3} more</div>` : '';
+    cells += `<div class="${cls}" onclick="calSelectDay('${ds}')"><div class="cal-dnum">${d}</div>${holHtml}${chips}${more}</div>`;
+  }
+
+  let dayList = '';
+  if (calSelected) {
+    const [Y, Mo, D] = calSelected.split('-').map(Number);
+    const dt = new Date(Y, Mo-1, D);
+    const label = `${CAL_WD_FULL[dt.getDay()]}, ${CAL_MONTHS[Mo-1]} ${D}, ${Y}`;
+    const hol = constructionHolidays(Y)[calSelected];
+    const jobs = calJobsOn(calSelected);
+    dayList = `<div class="cal-daylist"><div class="cal-daylist-h">${label}</div>`
+      + (hol ? `<div class="cal-daylist-hol">🏗️ ${escHtml(hol)} — typical day off</div>` : '')
+      + (jobs.length ? jobs.map(o =>
+          `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="showBoardJob(${o.id},'calendar')">
+            <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}</div>
+            <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
+          </div>`
+        ).join('') : '<div class="cal-empty">No jobs scheduled for this day. Tap a job on the board to schedule one.</div>')
+      + '</div>';
+  } else {
+    dayList = '<div class="cal-daylist"><div class="cal-empty">Tap a day to see its jobs. Tap a job to open its card.</div></div>';
+  }
+  el.innerHTML = `<div class="cal-grid cal-head">${head}</div><div class="cal-grid cal-body">${cells}</div>${dayList}`;
 }
 function setBoardFilter(f) {
   boardFilter = f;
@@ -3127,15 +3279,18 @@ function boardFitAll() {
 
 // ── Full-screen board job detail ──────────────────────────
 let boardJobEditMode = false;
-function showBoardJob(id) {
+let boardJobOrigin = 'board'; // where to return to from the job full view
+function showBoardJob(id, from) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
+  boardJobOrigin = from || 'board';
   currentBoardJobId = id;
   boardJobEditMode = false; // always open locked/read-only
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-boardjob').classList.add('active');
   renderBoardJob(id);
 }
+function backFromBoardJob() { if (boardJobOrigin === 'calendar') showCalendar(); else showBoard(); }
 function editBoardJob(id){ boardJobEditMode = true; renderBoardJob(id); }
 function doneEditBoardJob(id){ boardJobEditMode = false; renderBoardJob(id); }
 
@@ -3236,7 +3391,7 @@ function editBoardJobField(id, field, value) {
       && o.park && o.contact && o.contact.trim()) {
     upsertPropertyContact(o.park, { name: o.contact, title: o.contactTitle, phone: o.contactPhone, email: o.contactEmail });
   }
-  if (field === 'type' || field === 'park') showBoardJob(id); // refresh the shown address/contact for the new property
+  if (field === 'type' || field === 'park') showBoardJob(id, boardJobOrigin); // refresh the shown address/contact for the new property
   // A changed schedule date re-sorts its column (soonest first), so refresh the
   // board if it happens to be showing.
   if (field === 'scheduledDate') refreshBoardViews();
@@ -3271,8 +3426,10 @@ function saveBoardJobDone(id) {
 function refreshBoardViews() {
   const b = document.getElementById('screen-board');
   const d = document.getElementById('screen-boardjob');
+  const c = document.getElementById('screen-calendar');
   if (b && b.classList.contains('active')) renderBoard();
   if (d && d.classList.contains('active') && currentBoardJobId != null) renderBoardJob(currentBoardJobId);
+  if (c && c.classList.contains('active')) renderCalendar();
 }
 
 let permitJobId = null;
