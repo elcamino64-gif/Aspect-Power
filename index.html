@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: auto-scheduled-stage -->
+<!-- build: cal-events-resilient -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2813,16 +2813,31 @@ function persistBoardJob(job){ saveBoardJobsLocal(); saveBoardJobToCloud(job); }
 // ── Calendar events (birthdays, days off, reminders — separate from jobs) ──
 let calEvents = [];
 try { calEvents = JSON.parse(localStorage.getItem('calEvents') || '[]'); } catch(e){}
+// Ids of events confirmed saved to the cloud (so we can tell a not-yet-synced
+// local event from one that was deleted on another device).
+let calEventsSynced = {};
+try { calEventsSynced = JSON.parse(localStorage.getItem('calEventsSynced') || '{}'); } catch(e){}
 function saveCalEventsLocal(){ try { localStorage.setItem('calEvents', JSON.stringify(calEvents)); } catch(e){} }
+function markCalEventSynced(id){ calEventsSynced[String(id)] = 1; try { localStorage.setItem('calEventsSynced', JSON.stringify(calEventsSynced)); } catch(e){} }
+function unmarkCalEventSynced(id){ delete calEventsSynced[String(id)]; try { localStorage.setItem('calEventsSynced', JSON.stringify(calEventsSynced)); } catch(e){} }
 function calEventsOn(ds){ return calEvents.filter(e => (e.date||'') === ds).sort((a,b)=>(a.title||'').localeCompare(b.title||'')); }
 async function loadCalEventsFromCloud(){
-  try {
-    const rows = await sbFetch('calendar_events?order=created_at.desc');
-    if (rows && rows.length !== undefined) {
-      calEvents = rows.map(r => ({ id:r.id, date:r.date||'', title:r.title||'', note:r.note||'' }));
-      saveCalEventsLocal();
-    }
-  } catch(e) { console.error('loadCalEventsFromCloud failed (using local):', e); }
+  let rows = null;
+  try { rows = await sbFetch('calendar_events?order=created_at.desc'); }
+  catch(e) { console.error('loadCalEventsFromCloud failed (using local):', e); }
+  // Only merge when the cloud actually answered. If the table is missing or we
+  // are offline (rows === null), keep whatever is stored locally — never wipe it.
+  if (rows && rows.length !== undefined) {
+    const cloud = rows.map(r => ({ id:r.id, date:r.date||'', title:r.title||'', note:r.note||'' }));
+    const cloudIds = new Set(cloud.map(e => String(e.id)));
+    // Keep local events the cloud doesn't have ONLY if they were never synced
+    // (a synced-but-absent event was deleted elsewhere, so let it go).
+    const localOnly = calEvents.filter(e => !cloudIds.has(String(e.id)) && !calEventsSynced[String(e.id)]);
+    calEvents = cloud.concat(localOnly);
+    saveCalEventsLocal();
+    cloud.forEach(e => markCalEventSynced(e.id));
+    localOnly.forEach(e => saveCalEventToCloud(e)); // push the never-synced ones up
+  }
   if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
 }
 async function saveCalEventToCloud(ev){
@@ -2833,7 +2848,8 @@ async function saveCalEventToCloud(ev){
         'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ id: ev.id, date: ev.date, title: ev.title, note: ev.note })
     });
-    if (!res.ok) console.warn('saveCalEventToCloud failed (saved locally):', res.status, await res.text());
+    if (res.ok) markCalEventSynced(ev.id);
+    else console.warn('saveCalEventToCloud failed (saved locally):', res.status, await res.text());
   } catch(e) { console.error('saveCalEventToCloud network error (saved locally):', e); }
 }
 async function deleteCalEventFromCloud(id){
