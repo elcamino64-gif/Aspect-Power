@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: calendar-scroll -->
+<!-- build: cal-start-current-fullscreen -->
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Aspect Power"/>
@@ -15,7 +15,7 @@ input,textarea,select,button{font-family:inherit}
 input[type=date]{color-scheme:light}
 .screen{display:none;min-height:100vh;max-width:480px;margin:0 auto;flex-direction:column}
 .screen.active{display:flex}
-.header{position:sticky;top:0;z-index:100}
+.header{position:sticky;top:0;z-index:100;background:#fff;padding-top:env(safe-area-inset-top)}
 .logo-bar{background:#ffffff;padding:16px 20px;display:flex;justify-content:center;align-items:center}
 .logo-wrap{background:#ffffff;border:1px solid #d2d2d7;border-radius:14px;padding:14px 24px;display:flex;justify-content:center;align-items:center;margin:12px 16px 0}
 .logo-bar img{width:80%;max-width:340px;height:auto;object-fit:contain}
@@ -130,7 +130,17 @@ textarea{resize:vertical;line-height:1.6}
 #board-canvas.compact .board-card-meta{margin-top:7px}
 #board-canvas.compact .board-sched{font-size:20px}
 @media (orientation:landscape){
-  #screen-board.active{max-width:none}
+  /* Use the whole screen in landscape so the board and calendar are bigger */
+  #screen-board.active,#screen-calendar.active{max-width:none}
+  /* Slimmer logo header in landscape frees vertical space for content */
+  .logo-bar{padding:6px 20px}
+  .logo-bar img{max-width:190px}
+  #screen-calendar .cal-day{min-height:104px}
+  #screen-calendar .cal-chip{font-size:13px;padding:3px 8px;border-radius:5px}
+  #screen-calendar .cal-more{font-size:11px}
+  #screen-calendar .cal-dnum{font-size:14px;width:26px;height:26px}
+  #screen-calendar .cal-wd{font-size:12px}
+  #screen-calendar .cal-month-title{font-size:19px}
 }
 .board-col-head{display:flex;align-items:center;gap:9px;padding:0 2px 9px;border-bottom:1px solid #e5e5ea;margin-bottom:11px;flex-shrink:0}
 .board-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
@@ -287,6 +297,9 @@ textarea{resize:vertical;line-height:1.6}
 .cal-month{border-top:8px solid #f0f0f2}
 .cal-month:first-child{border-top:none}
 .cal-month-title{font-size:16px;font-weight:800;color:#1d1d1f;padding:14px 14px 8px;background:#fff}
+/* Calendar scrolls inside its own pane (so it can start on the current month) */
+#screen-calendar.active{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+#cal-content{padding:0 0 40px;background:#fff}
 </style>
 </head>
 <body>
@@ -2923,11 +2936,11 @@ function renderCalendar() {
   const prevScroll = el.scrollTop;
   const todayStr = ymd(new Date());
   const now = new Date();
-  // Render 2 months back through ~15 months forward for continuous scrolling.
-  let sy = now.getFullYear(), sm = now.getMonth() - 2;
+  // Render 6 months back through ~18 months forward for continuous scrolling.
+  let sy = now.getFullYear(), sm = now.getMonth() - 6;
   while (sm < 0) { sm += 12; sy--; }
   let html = '';
-  for (let k = 0; k < 18; k++) {
+  for (let k = 0; k < 24; k++) {
     const mi = sm + k;
     const yy = sy + Math.floor(mi / 12);
     const mm = ((mi % 12) + 12) % 12;
