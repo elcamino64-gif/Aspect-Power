@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: multi-date-jobs -->
+<!-- build: fix-legacy-dates -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2761,7 +2761,11 @@ function unpackContact(raw){
 // list (falling back to the single legacy scheduledDate); normalizeJobDates()
 // tidies the list and keeps scheduledDate = the earliest day for older code.
 function jobDates(o){
-  let ds = Array.isArray(o.scheduledDates) ? o.scheduledDates : (o.scheduledDate ? [o.scheduledDate] : []);
+  // Use the multi-day list only when it actually has days; otherwise fall back
+  // to the single legacy scheduledDate (so existing scheduled jobs still show).
+  let ds = (Array.isArray(o.scheduledDates) && o.scheduledDates.length)
+    ? o.scheduledDates
+    : (o.scheduledDate ? [o.scheduledDate] : []);
   return Array.from(new Set(ds.filter(Boolean))).sort();
 }
 function normalizeJobDates(o){
