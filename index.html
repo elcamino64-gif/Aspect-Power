@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: hide-completed-dates -->
+<!-- build: fix-remove-last-date -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3611,14 +3611,20 @@ function jobDatesControl(o) {
   ).join('');
   return `<div class="jd-wrap">${chips}${addTile('＋ Add a day', 'jd-add')}</div><div class="jd-hint">Tap a date to change it · ✕ to remove</div>`;
 }
+// Set a job's scheduled days explicitly. Unlike normalizeJobDates(), this does
+// NOT fall back to the legacy single date — so clearing to empty really clears
+// it (removing the last day was resurrecting it via the fallback).
+function setJobDates(o, list) {
+  const ds = Array.from(new Set((list || []).filter(Boolean))).sort();
+  o.scheduledDates = ds;
+  o.scheduledDate = ds[0] || '';
+  return ds;
+}
 // Replace one scheduled day with another (tap a date chip to change it).
 function changeJobDate(id, oldDate, newDate) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  const list = jobDates(o).filter(d => d !== oldDate);
-  if (!list.includes(newDate)) list.push(newDate);
-  o.scheduledDates = list;
-  normalizeJobDates(o);
+  setJobDates(o, [...jobDates(o).filter(d => d !== oldDate), newDate]);
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
@@ -3626,10 +3632,7 @@ function changeJobDate(id, oldDate, newDate) {
 function addJobScheduledDate(id, ds) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  const list = jobDates(o);
-  if (!list.includes(ds)) list.push(ds);
-  o.scheduledDates = list;
-  normalizeJobDates(o);
+  setJobDates(o, [...jobDates(o), ds]);
   // Assigning a day moves the job into Scheduled (from wherever it is).
   if (normalizeStage(o.status) !== 'Scheduled') {
     o.status = 'Scheduled';
@@ -3642,8 +3645,7 @@ function addJobScheduledDate(id, ds) {
 function removeJobDate(id, ds) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  o.scheduledDates = jobDates(o).filter(d => d !== ds);
-  normalizeJobDates(o);
+  setJobDates(o, jobDates(o).filter(d => d !== ds));
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
