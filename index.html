@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fix-remove-last-date -->
+<!-- build: instant-load -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -4091,20 +4091,23 @@ function initApp() {
   renderLabor();
   updateOrderCount();
   updateBoardCount();
-  loadCloudData();
   normalizePropertyInfo();
   rebuildTitleDatalist();
   reconcileContacts(); // backfill from whatever is cached locally right away
-  // Load the property directory + board jobs from the cloud, then backfill again
+  // Paint the cached Job Board immediately — no waiting on the network.
+  showBoard();
+  // Then refresh the token and sync from the cloud in the background, so the
+  // first paint is instant and the data fills in / updates a moment later.
   (async () => {
+    const ok = await ensureFreshToken();
+    if (!ok && authSession) { showLogin(); return; } // session expired — re-auth
+    loadCloudData();
     await loadPropertyInfoFromCloud();
     await loadBoardJobsFromCloud();
     await loadCalEventsFromCloud();
     reconcileContacts();
     if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   })();
-  // Land on the Job Board first
-  showBoard();
 }
 
 // ── Sign-in gate ──────────────────────────────────────────
@@ -4138,12 +4141,11 @@ async function submitLogin(){
 document.addEventListener('visibilitychange', () => { if (!document.hidden) ensureFreshToken(); });
 setInterval(() => { ensureFreshToken(); }, 30*60*1000);
 
-// On load: resume an existing session if valid, otherwise show the sign-in screen.
-(async () => {
-  if (authSession) {
-    const ok = await ensureFreshToken();
-    if (ok) { hideLogin(); startAppOnce(); return; }
-  }
+// On load: if we have a saved session, start the app right away from the local
+// cache (the token is refreshed in the background inside initApp). Only show the
+// sign-in screen when there is no session at all.
+(function () {
+  if (authSession) { hideLogin(); startAppOnce(); return; }
   showLogin();
 })();
 </script>
