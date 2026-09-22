@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: date-picker-ios-and-complete-clear -->
+<!-- build: hide-completed-dates -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -227,8 +227,9 @@ textarea{resize:vertical;line-height:1.6}
 .bj-stage-sel{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:14px;font-weight:600;color:#1d1d1f;background:#f5f5f7;border:1px solid #e0e0e5;border-radius:9px;padding:8px 32px 8px 12px;margin-top:2px;cursor:pointer;max-width:100%;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
 .jd-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}
 .jd-chip{display:inline-flex;align-items:center;gap:6px;background:#eaf4fe;color:#1d6fd0;font-size:14px;font-weight:600;padding:0 6px 0 0;border-radius:10px}
-.jd-chip button{background:none;border:none;color:#1d6fd0;font-size:14px;cursor:pointer;padding:2px 4px;line-height:1;opacity:0.65;font-family:inherit}
-.jd-chip button:active{opacity:1}
+.jd-chip button{background:#dbeafe;border:none;color:#c0392b;font-size:15px;font-weight:800;cursor:pointer;padding:6px 9px;line-height:1;font-family:inherit;border-radius:0 10px 10px 0}
+.jd-chip button:active{background:#c9ddfa}
+.jd-hint{width:100%;font-size:11.5px;color:#86868b;margin-top:7px}
 .jd-chip-date{padding:8px 4px 8px 11px;border-radius:10px 0 0 10px}
 .jd-add{background:#f5f5f7;border:1px dashed #b9c0cc;color:#334155;font-size:14px;font-weight:600;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit}
 /* A transparent native date input covering its tile → reliable picker on iOS */
@@ -2777,6 +2778,9 @@ function normalizeJobDates(o){
   o.scheduledDate = ds[0] || '';
   return ds;
 }
+function jobIsComplete(o){ return normalizeStage(o.status) === 'Complete — Ready to Bill'; }
+// Dates to SHOW on the board/calendar: a completed job comes off the schedule.
+function jobShownDates(o){ return jobIsComplete(o) ? [] : jobDates(o); }
 function jobToRow(j){
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
     location:j.spaceLocation, description:j.description, amount:j.total,
@@ -3044,7 +3048,7 @@ function calDeleteEvent(id) {
 }
 
 function calJobsOn(ds) {
-  return boardJobs.filter(o => jobDates(o).includes(ds))
+  return boardJobs.filter(o => jobShownDates(o).includes(ds))
     .sort((a,b) => (a.park||'').localeCompare(b.park||''));
 }
 
@@ -3114,7 +3118,7 @@ function boardCardHtml(o) {
     </div>
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
-    ${(()=>{const ds=jobDates(o);return ds.length?`<div class="board-card-meta"><span class="board-sched">📅 ${fmtDate(ds[0])}${ds.length>1?` +${ds.length-1} more`:''}</span></div>`:'';})()}
+    ${(()=>{const ds=jobShownDates(o);return ds.length?`<div class="board-card-meta"><span class="board-sched">📅 ${fmtDate(ds[0])}${ds.length>1?` +${ds.length-1} more`:''}</span></div>`:'';})()}
     ${tagHtml?`<div class="board-card-tagrow">${tagHtml}</div>`:''}
     ${boardDetailHtml(o)}
   </div>`;
@@ -3605,7 +3609,7 @@ function jobDatesControl(o) {
   const chips = ds.map(d =>
     `<span class="jd-chip"><label class="jd-tile jd-chip-date">${fmtDate(d)}<input type="date" class="jd-overlay" value="${d}" onchange="if(this.value)changeJobDate(${o.id},'${d}',this.value)"/></label><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
   ).join('');
-  return `<div class="jd-wrap">${chips}${addTile('＋ Add a day', 'jd-add')}</div>`;
+  return `<div class="jd-wrap">${chips}${addTile('＋ Add a day', 'jd-add')}</div><div class="jd-hint">Tap a date to change it · ✕ to remove</div>`;
 }
 // Replace one scheduled day with another (tap a date chip to change it).
 function changeJobDate(id, oldDate, newDate) {
@@ -3680,8 +3684,6 @@ function moveBoardStage(id, stage) {
     return; // answerPermit() sets the final stage
   }
   o.status = stage;
-  // A finished job comes off the schedule — clear its scheduled date(s).
-  if (normalizeStage(stage) === 'Complete — Ready to Bill') { o.scheduledDates = []; o.scheduledDate = ''; }
   persistBoardJob(o);
   seenStages[id] = normalizeStage(stage); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
