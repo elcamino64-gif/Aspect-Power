@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fix-legacy-dates -->
+<!-- build: date-picker-ios-and-complete-clear -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -226,11 +226,15 @@ textarea{resize:vertical;line-height:1.6}
 .bj-edit-btn.done{background:#2e97f2;color:#fff}
 .bj-stage-sel{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:14px;font-weight:600;color:#1d1d1f;background:#f5f5f7;border:1px solid #e0e0e5;border-radius:9px;padding:8px 32px 8px 12px;margin-top:2px;cursor:pointer;max-width:100%;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
 .jd-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}
-.jd-chip{display:inline-flex;align-items:center;gap:7px;background:#eaf4fe;color:#1d6fd0;font-size:14px;font-weight:600;padding:7px 8px 7px 11px;border-radius:10px}
-.jd-chip button{background:none;border:none;color:#1d6fd0;font-size:13px;cursor:pointer;padding:0;line-height:1;opacity:0.65;font-family:inherit}
+.jd-chip{display:inline-flex;align-items:center;gap:6px;background:#eaf4fe;color:#1d6fd0;font-size:14px;font-weight:600;padding:0 6px 0 0;border-radius:10px}
+.jd-chip button{background:none;border:none;color:#1d6fd0;font-size:14px;cursor:pointer;padding:2px 4px;line-height:1;opacity:0.65;font-family:inherit}
 .jd-chip button:active{opacity:1}
+.jd-chip-date{padding:8px 4px 8px 11px;border-radius:10px 0 0 10px}
 .jd-add{background:#f5f5f7;border:1px dashed #b9c0cc;color:#334155;font-size:14px;font-weight:600;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit}
-.jd-dateinput{width:auto;padding:6px 8px;margin-left:2px}
+/* A transparent native date input covering its tile → reliable picker on iOS */
+.jd-tile{position:relative;overflow:hidden;display:inline-block}
+.bj-setdate.jd-tile{display:block}
+.jd-overlay{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;margin:0;padding:0;cursor:pointer;font-size:16px}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 /* Clean read-only grouping (view mode) */
 .bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
@@ -608,8 +612,7 @@ textarea{resize:vertical;line-height:1.6}
       <select id="nj-stage"></select>
 
       <label class="fl">Scheduled For</label>
-      <button type="button" id="nj-sched-btn" class="bj-setdate" onclick="njRevealSched()">📅 Tap to set a scheduled date</button>
-      <input type="date" id="nj-sched" style="display:none"/>
+      <label class="bj-setdate jd-tile" style="display:block"><span id="nj-sched-text">📅 Tap to set a scheduled date</span><input type="date" id="nj-sched" class="jd-overlay" onchange="njSchedPicked()"/></label>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -3592,25 +3595,29 @@ function editBoardJobField(id, field, value) {
 // with a button to add another day. Used in both the locked and edit views.
 function jobDatesControl(o) {
   const ds = jobDates(o);
+  // A real <input type="date"> overlaid on the tile — tapping it opens the
+  // native picker reliably on iPhone (programmatic showPicker() is flaky there).
+  const addTile = (label, cls) =>
+    `<label class="${cls} jd-tile">${label}<input type="date" class="jd-overlay" onchange="if(this.value)addJobScheduledDate(${o.id},this.value)"/></label>`;
   if (!ds.length) {
-    return `<button type="button" class="bj-setdate" id="jdadd-${o.id}" onclick="addJobDate(${o.id})">📅 Tap to set a scheduled date</button>`;
+    return addTile('📅 Tap to set a scheduled date', 'bj-setdate');
   }
   const chips = ds.map(d =>
-    `<span class="jd-chip">${fmtDate(d)}<button type="button" title="Remove this day" onclick="event.stopPropagation();removeJobDate(${o.id},'${d}')">✕</button></span>`
+    `<span class="jd-chip"><label class="jd-tile jd-chip-date">${fmtDate(d)}<input type="date" class="jd-overlay" value="${d}" onchange="if(this.value)changeJobDate(${o.id},'${d}',this.value)"/></label><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
   ).join('');
-  return `<div class="jd-wrap">${chips}<button type="button" class="jd-add" id="jdadd-${o.id}" onclick="addJobDate(${o.id})">＋ Add a day</button></div>`;
+  return `<div class="jd-wrap">${chips}${addTile('＋ Add a day', 'jd-add')}</div>`;
 }
-// Reveal a date picker next to the add button; chosen day is added to the job.
-function addJobDate(id) {
-  const btn = document.getElementById('jdadd-' + id);
-  if (!btn) return;
-  const inp = document.createElement('input');
-  inp.type = 'date';
-  inp.className = 'jd-dateinput';
-  inp.onchange = () => { if (inp.value) addJobScheduledDate(id, inp.value); else renderBoardJob(id); };
-  btn.insertAdjacentElement('afterend', inp);
-  inp.focus();
-  if (inp.showPicker) { try { inp.showPicker(); } catch(e){} }
+// Replace one scheduled day with another (tap a date chip to change it).
+function changeJobDate(id, oldDate, newDate) {
+  const o = boardJobs.find(x => x.id === id);
+  if (!o) return;
+  const list = jobDates(o).filter(d => d !== oldDate);
+  if (!list.includes(newDate)) list.push(newDate);
+  o.scheduledDates = list;
+  normalizeJobDates(o);
+  persistBoardJob(o);
+  refreshBoardViews();
+  renderBoardJob(id);
 }
 function addJobScheduledDate(id, ds) {
   const o = boardJobs.find(x => x.id === id);
@@ -3673,6 +3680,8 @@ function moveBoardStage(id, stage) {
     return; // answerPermit() sets the final stage
   }
   o.status = stage;
+  // A finished job comes off the schedule — clear its scheduled date(s).
+  if (normalizeStage(stage) === 'Complete — Ready to Bill') { o.scheduledDates = []; o.scheduledDate = ''; }
   persistBoardJob(o);
   seenStages[id] = normalizeStage(stage); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
@@ -3738,19 +3747,18 @@ function njSetType(t) {
   const njStage = document.getElementById('nj-stage');
   if (njStage) njStage.value = 'Inquiries';
 }
-function njRevealSched() {
-  const btn = document.getElementById('nj-sched-btn');
+// Show the chosen date on the New Job "Scheduled" tile.
+function njSchedPicked() {
   const inp = document.getElementById('nj-sched');
-  if (btn) btn.style.display = 'none';
-  if (inp) { inp.style.display = ''; inp.focus(); if (inp.showPicker) { try { inp.showPicker(); } catch(e){} } }
+  const txt = document.getElementById('nj-sched-text');
+  if (txt) txt.textContent = (inp && inp.value) ? ('📅 ' + fmtDate(inp.value) + ' — tap to change') : '📅 Tap to set a scheduled date';
 }
 function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
   ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email','nj-sched'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  // Reset the scheduled-date control back to its "Tap to set" button
-  const njSched = document.getElementById('nj-sched'); if (njSched) njSched.style.display = 'none';
-  const njSchedBtn = document.getElementById('nj-sched-btn'); if (njSchedBtn) njSchedBtn.style.display = '';
+  // Reset the scheduled-date tile back to its "Tap to set" label
+  const njSchedText = document.getElementById('nj-sched-text'); if (njSchedText) njSchedText.textContent = '📅 Tap to set a scheduled date';
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
