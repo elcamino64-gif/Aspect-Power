@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: completed-on-calendar -->
+<!-- build: desc-preserve-newlines -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3553,7 +3553,7 @@ function renderBoardJob(id) {
         <div class="bj-row"><div class="l">Stage</div><div class="v">${stageControl}</div></div>`;
     top += `
         ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
-        ${o.description ? row('Description', escHtml(o.description)) : ''}
+        ${o.description ? `<div class="bj-row"><div class="l">Description</div><div class="v" style="white-space:pre-wrap">${escHtml(o.description)}</div></div>` : ''}
         ${o.statusTag ? row('Status', escHtml(o.statusTag)) : ''}
         ${row('Property Address', addrHtml, !jobAddr)}
         ${row('Contact', contactHtml, !hasContact)}
