@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: instant-load -->
+<!-- build: completed-on-calendar -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2780,6 +2780,8 @@ function normalizeJobDates(o){
 }
 function jobIsComplete(o){ return normalizeStage(o.status) === 'Complete — Ready to Bill'; }
 // Dates to SHOW on the board/calendar: a completed job comes off the schedule.
+// Dates to show on the BOARD card: a completed job's date is hidden there
+// (the calendar still shows it — see calJobsOn — so past work stays reviewable).
 function jobShownDates(o){ return jobIsComplete(o) ? [] : jobDates(o); }
 function jobToRow(j){
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
@@ -3048,7 +3050,9 @@ function calDeleteEvent(id) {
 }
 
 function calJobsOn(ds) {
-  return boardJobs.filter(o => jobShownDates(o).includes(ds))
+  // The calendar shows ALL scheduled jobs, including completed ones, so past
+  // work stays on the calendar for review (completed jobs render green).
+  return boardJobs.filter(o => jobDates(o).includes(ds))
     .sort((a,b) => (a.park||'').localeCompare(b.park||''));
 }
 
