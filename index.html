@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: multiday-persist-csv -->
+<!-- build: fuel-rate-095 -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -464,7 +464,7 @@ textarea{resize:vertical;line-height:1.6}
         <option value="3">3 vehicles</option><option value="4">4 vehicles</option>
         <option value="5">5 vehicles</option>
       </select>
-      <div style="font-size:11px;color:#86868b;margin-top:6px">$0.75/mile · mileage calculated by office</div>
+      <div style="font-size:11px;color:#86868b;margin-top:6px">$0.95/mile · mileage calculated by office</div>
       <div id="mileage-ref" style="font-size:12px;color:#86868b;margin-top:8px"></div>
     </div>
 
@@ -1273,11 +1273,11 @@ function handleParkChange(val) {
 }
 function handleTechChange(val) { /* just use the selected value */ }
 
-// ── MILEAGE (round-trip miles from shop; fuel = miles × $0.75) ────────────
+// ── MILEAGE (round-trip miles from shop; fuel = miles × $0.95) ────────────
 let mileageDB = {};
 try { mileageDB = JSON.parse(localStorage.getItem('mileageDB') || '{}'); } catch(e){}
 
-const FUEL_RATE = 0.75; // dollars per round-trip mile
+const FUEL_RATE = 0.95; // dollars per round-trip mile
 // Round-trip mileage (shop → park → shop) from the office mileage sheet. Baked
 // in so it auto-fills on every device with no setup. A value saved by hand for
 // a property overrides the sheet.
@@ -2268,7 +2268,7 @@ function buildPlainEmail(o) {
   if (fuelMiles != null) {
     b += `${fuelMiles} mi round trip × $${FUEL_RATE.toFixed(2)}/mi  =  $${(fuelMiles*FUEL_RATE).toFixed(2)}\n`;
   } else {
-    b += `${o.fuelVehicles||1} vehicle(s)   $0.75/mile — calculated by office\n`;
+    b += `${o.fuelVehicles||1} vehicle(s)   $0.95/mile — calculated by office\n`;
   }
 
   if (o.otherNotes) {
@@ -2368,7 +2368,7 @@ function buildHtmlEmail(o) {
   const fuelSection = card('Fuel Surcharge', `
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <span style="color:#1d1d1f;font-size:14px;">${o.fuelVehicles||1} vehicle(s)</span>
-      <span style="color:#86868b;font-size:13px;">$0.75/mile \u2013 office calculates</span>
+      <span style="color:#86868b;font-size:13px;">$0.95/mile \u2013 office calculates</span>
     </div>`);
 
   // Notes
@@ -2511,7 +2511,7 @@ LABORER
 FUEL SURCHARGE
 
 ${o.fuelVehicles||1} vehicle(s) dispatched
-$0.75/mile — calculated by office
+$0.95/mile — calculated by office
 
 `;
 
