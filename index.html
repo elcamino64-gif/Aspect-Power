@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: desc-preserve-newlines -->
+<!-- build: multiday-persist-csv -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2784,20 +2784,26 @@ function jobIsComplete(o){ return normalizeStage(o.status) === 'Complete — Rea
 // (the calendar still shows it — see calJobsOn — so past work stays reviewable).
 function jobShownDates(o){ return jobIsComplete(o) ? [] : jobDates(o); }
 function jobToRow(j){
+  const ds = jobDates(j);
   return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
     location:j.spaceLocation, description:j.description, amount:j.total,
     status_tag:j.statusTag, contact:packContact(j), notes:j.otherNotes,
     checklist:j.checklist, attachments:j.attachments || [],
-    scheduled_date:j.scheduledDate || null, scheduled_dates:jobDates(j) };
+    // Pack ALL days into scheduled_date (comma-separated) so multi-day jobs
+    // survive even if the newer scheduled_dates column was never added.
+    scheduled_date: ds.join(',') || null, scheduled_dates: ds };
 }
 function rowToJob(r){
+  const csv = String(r.scheduled_date || '').split(',').map(s => s.trim()).filter(Boolean);
   const o = { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
     by:r.technician||'', spaceLocation:r.location||'', description:r.description||'',
     total:parseFloat(r.amount)||0, statusTag:r.status_tag||'',
     ...unpackContact(r.contact),
     otherNotes:r.notes||'', date:r.created_at ? String(r.created_at).slice(0,10) : '',
-    scheduledDate:r.scheduled_date || '',
-    scheduledDates:Array.isArray(r.scheduled_dates)?r.scheduled_dates:[],
+    scheduledDate: csv[0] || '',
+    // Prefer the dedicated column when present; otherwise rebuild from the
+    // comma-separated scheduled_date so every day comes back.
+    scheduledDates: (Array.isArray(r.scheduled_dates) && r.scheduled_dates.length) ? r.scheduled_dates : csv,
     checklist:Array.isArray(r.checklist)?r.checklist:[],
     attachments:Array.isArray(r.attachments)?r.attachments:[] };
   normalizeJobDates(o);
