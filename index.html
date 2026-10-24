@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: polish-toasts -->
+<!-- build: inapp-pinch-zoom -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -272,7 +272,7 @@ textarea{resize:vertical;line-height:1.6}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:16px;gap:12px}
 .lightbox.show{display:flex}
 .lightbox-stage{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;gap:4px}
-.lightbox img{max-width:100%;max-height:100%;border-radius:8px;cursor:zoom-in;flex-shrink:1;object-fit:contain;touch-action:pan-y}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;touch-action:none;transform-origin:center center;will-change:transform}
 .lightbox-bar{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .lightbox-open{background:#2e97f2;color:#fff;border:none;font-size:15px;font-weight:600;padding:10px 16px;border-radius:12px;cursor:pointer;font-family:inherit}
 .lightbox-counter{color:#fff;font-size:14px;font-weight:600;min-width:52px;text-align:center}
@@ -668,13 +668,13 @@ textarea{resize:vertical;line-height:1.6}
 <!-- Image attachment lightbox (swipeable gallery) -->
 <div class="lightbox" id="att-lightbox" onclick="if(event.target===this)closeLightbox()">
   <div class="lightbox-bar">
-    <button class="lightbox-open" onclick="openLightboxFull()">⤢ Open full size (zoom &amp; save)</button>
+    <button class="lightbox-open" onclick="openLightboxFull()">⤓ Open to save / print</button>
     <span class="lightbox-counter" id="lb-counter"></span>
     <button class="lightbox-close" onclick="closeLightbox()">×</button>
   </div>
   <div class="lightbox-stage" onclick="if(event.target===this)closeLightbox()">
     <button class="lb-nav" id="lb-prev" onclick="event.stopPropagation();lightboxPrev()" aria-label="Previous photo">‹</button>
-    <img id="att-lightbox-img" src="" alt="attachment" ontouchstart="lbTouchStart(event)" ontouchend="lbTouchEnd(event)" onclick="openLightboxFull()"/>
+    <img id="att-lightbox-img" src="" alt="attachment"/>
     <button class="lb-nav" id="lb-next" onclick="event.stopPropagation();lightboxNext()" aria-label="Next photo">›</button>
   </div>
   <div class="lightbox-hint" id="lb-hint"></div>
@@ -3414,6 +3414,7 @@ function updateLightbox() {
   const cur = lightboxImages[lightboxIndex] || {};
   lightboxDataUrl = cur.dataUrl || '';
   document.getElementById('att-lightbox-img').src = lightboxDataUrl;
+  lbResetZoom();
   const multi = lightboxImages.length > 1;
   const prev = document.getElementById('lb-prev'), next = document.getElementById('lb-next');
   if (prev) prev.style.display = multi ? '' : 'none';
@@ -3421,24 +3422,75 @@ function updateLightbox() {
   const counter = document.getElementById('lb-counter');
   if (counter) counter.textContent = multi ? `${lightboxIndex + 1} / ${lightboxImages.length}` : '';
   const hint = document.getElementById('lb-hint');
-  if (hint) hint.textContent = multi ? 'Swipe or use ‹ › to see more' : '';
+  if (hint) hint.textContent = (multi ? 'Swipe to change · ' : '') + 'Pinch or double-tap to zoom';
 }
 function lightboxPrev() { if (lightboxImages.length) { lightboxIndex = (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length; updateLightbox(); } }
 function lightboxNext() { if (lightboxImages.length) { lightboxIndex = (lightboxIndex + 1) % lightboxImages.length; updateLightbox(); } }
 function openLightboxFull() { if (lightboxDataUrl) openInNewTab(lightboxDataUrl); }
-// Swipe left/right to move between photos.
-let lbTouch = null;
-function lbTouchStart(e) { const t = e.changedTouches[0]; lbTouch = { x: t.clientX, y: t.clientY }; }
-function lbTouchEnd(e) {
-  if (!lbTouch) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - lbTouch.x, dy = t.clientY - lbTouch.y;
-  lbTouch = null;
-  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-    e.preventDefault(); // swipe → navigate (and suppress the tap-to-open-full-size)
-    if (dx < 0) lightboxNext(); else lightboxPrev();
+
+// ── In-app pinch / double-tap zoom + pan for the gallery image ──
+let lbScale = 1, lbTx = 0, lbTy = 0;
+let lbPinchDist0 = 0, lbPinchScale0 = 1, lbPanX0 = 0, lbPanY0 = 0, lbTx0 = 0, lbTy0 = 0;
+let lbPinching = false, lbPanning = false, lbSX = 0, lbSY = 0, lbMoved = false, lbLastTap = 0;
+function lbImg() { return document.getElementById('att-lightbox-img'); }
+function lbApply(withTransition) {
+  const img = lbImg(); if (!img) return;
+  img.style.transition = withTransition ? 'transform 0.2s' : 'none';
+  img.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbScale})`;
+}
+function lbResetZoom() { lbScale = 1; lbTx = 0; lbTy = 0; lbApply(false); }
+function lbDist(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+function lbClamp() {
+  const img = lbImg(); if (!img) return;
+  const maxX = Math.max(0, (img.clientWidth * lbScale - img.clientWidth) / 2);
+  const maxY = Math.max(0, (img.clientHeight * lbScale - img.clientHeight) / 2);
+  lbTx = Math.max(-maxX, Math.min(maxX, lbTx));
+  lbTy = Math.max(-maxY, Math.min(maxY, lbTy));
+}
+function lbTouchStartZ(e) {
+  const t = e.touches;
+  if (t.length === 2) { lbPinching = true; lbPanning = false; lbPinchDist0 = lbDist(t); lbPinchScale0 = lbScale; e.preventDefault(); }
+  else if (t.length === 1) {
+    lbSX = t[0].clientX; lbSY = t[0].clientY; lbMoved = false;
+    if (lbScale > 1.02) { lbPanning = true; lbPanX0 = t[0].clientX; lbPanY0 = t[0].clientY; lbTx0 = lbTx; lbTy0 = lbTy; }
   }
 }
+function lbTouchMoveZ(e) {
+  const t = e.touches;
+  if (lbPinching && t.length === 2) {
+    lbScale = Math.max(1, Math.min(5, lbPinchScale0 * (lbDist(t) / lbPinchDist0)));
+    lbClamp(); lbApply(false); e.preventDefault();
+  } else if (lbPanning && t.length === 1) {
+    lbTx = lbTx0 + (t[0].clientX - lbPanX0); lbTy = lbTy0 + (t[0].clientY - lbPanY0);
+    lbClamp(); lbApply(false); e.preventDefault();
+  } else if (t.length === 1) {
+    if (Math.abs(t[0].clientX - lbSX) > 10 || Math.abs(t[0].clientY - lbSY) > 10) lbMoved = true;
+  }
+}
+function lbTouchEndZ(e) {
+  if (lbPinching && e.touches.length < 2) { lbPinching = false; if (lbScale <= 1.02) lbResetZoom(); }
+  if (lbPanning && e.touches.length === 0) lbPanning = false;
+  if (e.touches.length === 0 && lbScale <= 1.02) {
+    const c = e.changedTouches[0];
+    const dx = c.clientX - lbSX, dy = c.clientY - lbSY;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) lightboxNext(); else lightboxPrev(); return; }
+    if (!lbMoved) {
+      const now = Date.now();
+      if (now - lbLastTap < 300) { lbScale = 2.5; lbApply(true); lbLastTap = 0; }  // double-tap → zoom
+      else lbLastTap = now;
+    }
+  }
+}
+function lbDblClick() { if (lbScale > 1.02) lbResetZoom(); else { lbScale = 2.5; lbApply(true); } }
+function lbWheel(e) { e.preventDefault(); lbScale = Math.max(1, Math.min(5, lbScale * (e.deltaY < 0 ? 1.12 : 0.89))); if (lbScale <= 1.02) { lbTx = 0; lbTy = 0; } lbClamp(); lbApply(false); }
+(function bindLightboxZoom() {
+  const img = lbImg(); if (!img) return;
+  img.addEventListener('touchstart', lbTouchStartZ, { passive: false });
+  img.addEventListener('touchmove', lbTouchMoveZ, { passive: false });
+  img.addEventListener('touchend', lbTouchEndZ, { passive: false });
+  img.addEventListener('dblclick', lbDblClick);
+  img.addEventListener('wheel', lbWheel, { passive: false });
+})();
 // Arrow keys on desktop.
 document.addEventListener('keydown', (e) => {
   if (!document.getElementById('att-lightbox').classList.contains('show')) return;
@@ -3461,7 +3513,7 @@ function openAttachment(jobId, attId) {
   // PDFs / other files open in a new tab (works from this tap gesture)
   openInNewTab(a.dataUrl);
 }
-function closeLightbox() { document.getElementById('att-lightbox').classList.remove('show'); }
+function closeLightbox() { lbResetZoom(); document.getElementById('att-lightbox').classList.remove('show'); }
 
 function boardDetailHtml(o) {
   let h = '<div class="board-detail">';
