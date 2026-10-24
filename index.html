@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fuel-rate-095 -->
+<!-- build: ios-inputs-and-photo-quality -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -226,16 +226,14 @@ textarea{resize:vertical;line-height:1.6}
 .bj-edit-btn.done{background:#2e97f2;color:#fff}
 .bj-stage-sel{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:14px;font-weight:600;color:#1d1d1f;background:#f5f5f7;border:1px solid #e0e0e5;border-radius:9px;padding:8px 32px 8px 12px;margin-top:2px;cursor:pointer;max-width:100%;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
 .jd-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}
-.jd-chip{display:inline-flex;align-items:center;gap:6px;background:#eaf4fe;color:#1d6fd0;font-size:14px;font-weight:600;padding:0 6px 0 0;border-radius:10px}
-.jd-chip button{background:#dbeafe;border:none;color:#c0392b;font-size:15px;font-weight:800;cursor:pointer;padding:6px 9px;line-height:1;font-family:inherit;border-radius:0 10px 10px 0}
+.jd-chip{display:inline-flex;align-items:center;gap:4px;background:#eaf4fe;border:1px solid #cfe2fb;border-radius:10px;padding:2px 4px 2px 2px}
+.jd-chip button{background:#dbeafe;border:none;color:#c0392b;font-size:15px;font-weight:800;cursor:pointer;padding:6px 9px;line-height:1;font-family:inherit;border-radius:8px}
 .jd-chip button:active{background:#c9ddfa}
 .jd-hint{width:100%;font-size:11.5px;color:#86868b;margin-top:7px}
-.jd-chip-date{padding:8px 4px 8px 11px;border-radius:10px 0 0 10px}
-.jd-add{background:#f5f5f7;border:1px dashed #b9c0cc;color:#334155;font-size:14px;font-weight:600;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit}
-/* A transparent native date input covering its tile → reliable picker on iOS */
-.jd-tile{position:relative;overflow:hidden;display:inline-block}
-.bj-setdate.jd-tile{display:block}
-.jd-overlay{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;margin:0;padding:0;cursor:pointer;font-size:16px}
+/* Visible native date inputs — open the picker reliably on iPhone */
+.jd-dateinput,.jd-addinput{font-size:16px;font-family:inherit;color:#1d6fd0;font-weight:600;background:transparent;border:none;padding:6px 6px;min-width:120px}
+.jd-addinput{color:#334155;background:#f5f5f7;border:1px dashed #b9c0cc;border-radius:10px}
+.jd-addlabel{font-size:14px;font-weight:600;color:#86868b}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 /* Clean read-only grouping (view mode) */
 .bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
@@ -259,21 +257,22 @@ textarea{resize:vertical;line-height:1.6}
 .att-del{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:#ff3b30;color:#fff;border:2px solid #fff;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .att-file .att-del{position:static;border:none;width:24px;height:24px;flex-shrink:0}
 .att-add{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
-.att-adder{margin-top:10px;position:relative}
-.att-add-select{-webkit-appearance:none;appearance:none;display:inline-block;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:11px 34px 11px 16px;border-radius:12px;cursor:pointer;font-family:inherit;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%232e97f2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 14px center}
-.att-menu{position:absolute;z-index:20;top:100%;left:0;margin-top:6px;min-width:190px;background:#fff;border:1px solid #e0e0e5;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.14);overflow:hidden;padding:4px}
-.att-menu-item{display:block;font-size:15px;font-weight:500;color:#1d1d1f;padding:11px 14px;border-radius:8px;cursor:pointer}
-.att-menu-item:hover{background:#f2f7fd;color:#2e97f2}
-.att-menu-item input{display:none}
+.att-adder{margin-top:10px}
+.att-addrow{display:flex;flex-wrap:wrap;gap:8px}
+.att-addbtn{display:inline-flex;align-items:center;gap:5px;border:1.5px dashed #2e97f2;color:#2e97f2;background:transparent;font-size:14px;font-weight:600;padding:9px 13px;border-radius:11px;cursor:pointer;font-family:inherit}
+.att-addbtn:active{background:#eaf4fe}
+.att-addbtn input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 .att-paste{margin-top:10px;border:1.5px dashed #c7c7cc;border-radius:12px;padding:14px 12px;text-align:center;color:#86868b;font-size:13px;font-weight:500;background:#fafafa;min-height:18px;outline:none;cursor:text}
 .att-paste:empty::before{content:attr(data-ph)}
 .att-paste:focus{border-color:#2e97f2}
 .att-paste.drag{border-color:#2e97f2;background:#eaf4fe;color:#2e97f2}
 .att-empty{font-size:12.5px;color:#c7c7cc;font-style:italic}
-.lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:16px;gap:12px}
 .lightbox.show{display:flex}
-.lightbox img{max-width:100%;max-height:90vh;border-radius:8px}
-.lightbox-close{position:absolute;top:16px;right:20px;color:#fff;font-size:34px;background:none;border:none;cursor:pointer;line-height:1}
+.lightbox img{max-width:100%;max-height:82vh;border-radius:8px;cursor:zoom-in}
+.lightbox-bar{display:flex;align-items:center;gap:12px}
+.lightbox-open{background:#2e97f2;color:#fff;border:none;font-size:15px;font-weight:600;padding:10px 16px;border-radius:12px;cursor:pointer;font-family:inherit}
+.lightbox-close{color:#fff;font-size:30px;background:rgba(255,255,255,0.15);border:none;cursor:pointer;line-height:1;width:44px;height:44px;border-radius:50%}
 /* Calendar */
 .cal-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid #e5e5ea}
 .cal-title{flex:1;text-align:center;font-size:17px;font-weight:800;color:#1d1d1f}
@@ -613,7 +612,7 @@ textarea{resize:vertical;line-height:1.6}
       <select id="nj-stage"></select>
 
       <label class="fl">Scheduled For</label>
-      <label class="bj-setdate jd-tile" style="display:block"><span id="nj-sched-text">📅 Tap to set a scheduled date</span><input type="date" id="nj-sched" class="jd-overlay" onchange="njSchedPicked()"/></label>
+      <div style="display:flex;align-items:center;gap:8px"><span class="jd-addlabel">📅 Pick a date:</span><input type="date" id="nj-sched" class="jd-addinput" style="min-width:170px"/></div>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -657,9 +656,12 @@ textarea{resize:vertical;line-height:1.6}
 <datalist id="title-options"></datalist>
 
 <!-- Image attachment lightbox -->
-<div class="lightbox" id="att-lightbox" onclick="closeLightbox()">
-  <button class="lightbox-close" onclick="closeLightbox()">×</button>
-  <img id="att-lightbox-img" src="" alt="attachment"/>
+<div class="lightbox" id="att-lightbox" onclick="if(event.target===this)closeLightbox()">
+  <div class="lightbox-bar">
+    <button class="lightbox-open" onclick="openLightboxFull()">⤢ Open full size (zoom &amp; save)</button>
+    <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  </div>
+  <img id="att-lightbox-img" src="" alt="attachment" onclick="openLightboxFull()"/>
 </div>
 
 <!-- Permit Required? Yes/No dialog -->
@@ -3182,14 +3184,16 @@ function attAdderHtml(mode, id) {
   const onchangeFor = (cat) => mode === 'job'
     ? `handleAttachmentPick(event,${id},'${cat}')`
     : `njHandleAttachmentPick(event,'${cat}')`;
-  const items = ATT_CATS.map(cat =>
-    `<label class="att-menu-item" onclick="event.stopPropagation()"><input type="file" accept="${attAcceptFor(cat)}" multiple onchange="${onchangeFor(cat)};closeAttMenus()"/>${cat}</label>`
+  const icon = (cat) => cat === 'Pictures' ? '📷' : '📎';
+  // Always-visible category buttons: a plain <label> wrapping a file input.
+  // Tapping the label opens the native picker directly — reliable on iPhone.
+  const buttons = ATT_CATS.map(cat =>
+    `<label class="att-addbtn"><input type="file" accept="${attAcceptFor(cat)}" multiple onchange="${onchangeFor(cat)}"/>${icon(cat)} ${cat}</label>`
   ).join('');
   const pasteH = mode === 'job' ? `attJobPaste(event,${id})` : `njAttPaste(event)`;
   const dropH  = mode === 'job' ? `attJobDrop(event,${id})`  : `njAttDrop(event)`;
   return `<div class="att-adder">
-      <button type="button" class="att-add-select" onclick="toggleAttMenu(event,this)">📎 Add attachment…</button>
-      <div class="att-menu" hidden>${items}</div>
+      <div class="att-addrow">${buttons}</div>
       <div class="att-paste" contenteditable="true" data-ph="📋 Right-click ▸ Paste, or drag a file here" onpaste="${pasteH}" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="${dropH}"></div>
     </div>`;
 }
@@ -3245,7 +3249,10 @@ async function fileToAttachment(file, category, idBump) {
     let dataUrl, type = file.type || 'application/octet-stream';
     const isImg = type.indexOf('image/') === 0;
     if (isImg) {
-      dataUrl = await compressImage(file, 1400, 0.7);
+      // Keep photos at (near) full quality: no downsizing up to 4096px on the
+      // long edge, near-lossless JPEG. Normalizing to JPEG also fixes iPhone
+      // HEIC photos that other devices/browsers can't display.
+      dataUrl = await compressImage(file, 4096, 0.95);
       type = 'image/jpeg';
     } else {
       if (file.size > 4 * 1024 * 1024) { alert('"' + (file.name || 'file') + '" is over 4 MB and was skipped. Please attach a smaller file (or a photo).'); return null; }
@@ -3260,20 +3267,6 @@ async function fileToAttachment(file, category, idBump) {
     return null;
   }
 }
-
-// The "Add attachment" dropdown is a button + a menu of real <label> file
-// inputs (one per category). Clicking a label opens the file dialog natively —
-// this is a reliable user gesture on every browser, unlike calling input.click()
-// from a <select> change (which some browsers, esp. Safari, silently ignore).
-function toggleAttMenu(e, btn) {
-  e.stopPropagation();
-  const menu = btn.parentElement.querySelector('.att-menu');
-  const wasOpen = menu && !menu.hidden;
-  closeAttMenus();
-  if (menu && !wasOpen) menu.hidden = false;
-}
-function closeAttMenus() { document.querySelectorAll('.att-menu').forEach(m => m.hidden = true); }
-document.addEventListener('click', closeAttMenus);
 
 // ── Shared attach helpers (used by browse, paste, and drag-drop) ──
 function clipboardFiles(cd) {
@@ -3356,19 +3349,10 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([arr], { type: mime });
 }
 
-function openAttachment(jobId, attId) {
-  const o = boardJobs.find(x => x.id === jobId);
-  const a = o && Array.isArray(o.attachments) ? o.attachments.find(x => x.id === attId) : null;
-  if (!a) return;
-  // Images open in the in-app lightbox
-  if (a.type && a.type.indexOf('image/') === 0) {
-    document.getElementById('att-lightbox-img').src = a.dataUrl;
-    document.getElementById('att-lightbox').classList.add('show');
-    return;
-  }
-  // PDFs / other files open in a new tab (works from this tap gesture)
+// Open a file/image in a new browser tab (native viewer: pinch-zoom + save).
+function openInNewTab(dataUrl) {
   try {
-    const url = URL.createObjectURL(dataUrlToBlob(a.dataUrl));
+    const url = URL.createObjectURL(dataUrlToBlob(dataUrl));
     const link = document.createElement('a');
     link.href = url; link.target = '_blank'; link.rel = 'noopener';
     document.body.appendChild(link); link.click(); link.remove();
@@ -3377,6 +3361,23 @@ function openAttachment(jobId, attId) {
     console.error('open attachment failed:', e);
     alert('Sorry, this file could not be opened.');
   }
+}
+let lightboxDataUrl = '';
+function showLightbox(dataUrl) {
+  lightboxDataUrl = dataUrl;
+  document.getElementById('att-lightbox-img').src = dataUrl;
+  document.getElementById('att-lightbox').classList.add('show');
+}
+function openLightboxFull() { if (lightboxDataUrl) openInNewTab(lightboxDataUrl); }
+
+function openAttachment(jobId, attId) {
+  const o = boardJobs.find(x => x.id === jobId);
+  const a = o && Array.isArray(o.attachments) ? o.attachments.find(x => x.id === attId) : null;
+  if (!a) return;
+  // Images open in the in-app lightbox (with an "open full size" button)
+  if (a.type && a.type.indexOf('image/') === 0) { showLightbox(a.dataUrl); return; }
+  // PDFs / other files open in a new tab (works from this tap gesture)
+  openInNewTab(a.dataUrl);
 }
 function closeLightbox() { document.getElementById('att-lightbox').classList.remove('show'); }
 
@@ -3605,21 +3606,19 @@ function editBoardJobField(id, field, value) {
   // board if it happens to be showing.
   if (field === 'scheduledDate') refreshBoardViews();
 }
-// Multi-date scheduling control: shows each assigned day as a removable chip,
-// with a button to add another day. Used in both the locked and edit views.
+// Multi-date scheduling control. Uses VISIBLE native date inputs, which open
+// the picker reliably on iPhone (an invisible/opacity:0 date input often won't).
 function jobDatesControl(o) {
   const ds = jobDates(o);
-  // A real <input type="date"> overlaid on the tile — tapping it opens the
-  // native picker reliably on iPhone (programmatic showPicker() is flaky there).
-  const addTile = (label, cls) =>
-    `<label class="${cls} jd-tile">${label}<input type="date" class="jd-overlay" onchange="if(this.value)addJobScheduledDate(${o.id},this.value)"/></label>`;
+  // The empty "add a day" picker — pick a date and it's added, then it resets.
+  const addInput = `<input type="date" class="jd-addinput" aria-label="Add a scheduled day" onchange="if(this.value){addJobScheduledDate(${o.id},this.value); this.value='';}"/>`;
   if (!ds.length) {
-    return addTile('📅 Tap to set a scheduled date', 'bj-setdate');
+    return `<div class="jd-wrap"><span class="jd-addlabel">📅 Pick a date:</span>${addInput}</div>`;
   }
   const chips = ds.map(d =>
-    `<span class="jd-chip"><label class="jd-tile jd-chip-date">${fmtDate(d)}<input type="date" class="jd-overlay" value="${d}" onchange="if(this.value)changeJobDate(${o.id},'${d}',this.value)"/></label><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
+    `<span class="jd-chip"><input type="date" class="jd-dateinput" value="${d}" onchange="if(this.value)changeJobDate(${o.id},'${d}',this.value)"/><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
   ).join('');
-  return `<div class="jd-wrap">${chips}${addTile('＋ Add a day', 'jd-add')}</div><div class="jd-hint">Tap a date to change it · ✕ to remove</div>`;
+  return `<div class="jd-wrap">${chips}<span class="jd-addlabel">Add:</span>${addInput}</div><div class="jd-hint">Tap a date to change it · ✕ to remove · use the empty box to add another day</div>`;
 }
 // Set a job's scheduled days explicitly. Unlike normalizeJobDates(), this does
 // NOT fall back to the legacy single date — so clearing to empty really clears
@@ -3761,18 +3760,10 @@ function njSetType(t) {
   const njStage = document.getElementById('nj-stage');
   if (njStage) njStage.value = 'Inquiries';
 }
-// Show the chosen date on the New Job "Scheduled" tile.
-function njSchedPicked() {
-  const inp = document.getElementById('nj-sched');
-  const txt = document.getElementById('nj-sched-text');
-  if (txt) txt.textContent = (inp && inp.value) ? ('📅 ' + fmtDate(inp.value) + ' — tap to change') : '📅 Tap to set a scheduled date';
-}
 function openNewJob() {
   populateBoardDropdowns();
   njSetType('project');
   ['nj-space','nj-desc','nj-tag','nj-contact','nj-contact-title','nj-contact-phone','nj-contact-email','nj-sched'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  // Reset the scheduled-date tile back to its "Tap to set" label
-  const njSchedText = document.getElementById('nj-sched-text'); if (njSchedText) njSchedText.textContent = '📅 Tap to set a scheduled date';
   const njBy = document.getElementById('nj-by'); if (njBy) njBy.value = technicians.includes('Patrick Gipson') ? 'Patrick Gipson' : (technicians[0] || '');
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
@@ -3820,17 +3811,8 @@ function njDeleteAttachment(attId) {
 function njOpenAttachment(attId) {
   const a = njAttachments.find(x => x.id === attId);
   if (!a) return;
-  if (a.type && a.type.indexOf('image/') === 0) {
-    document.getElementById('att-lightbox-img').src = a.dataUrl;
-    document.getElementById('att-lightbox').classList.add('show');
-    return;
-  }
-  try {
-    const url = URL.createObjectURL(dataUrlToBlob(a.dataUrl));
-    const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener';
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (e) { console.error(e); alert('Sorry, this file could not be opened.'); }
+  if (a.type && a.type.indexOf('image/') === 0) { showLightbox(a.dataUrl); return; }
+  openInNewTab(a.dataUrl);
 }
 function closeNewJob() { document.getElementById('nj-overlay').classList.remove('show'); }
 function njNewProperty() {
