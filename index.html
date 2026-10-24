@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: date-input-polish -->
+<!-- build: date-input-clean-field -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -230,13 +230,12 @@ textarea{resize:vertical;line-height:1.6}
 .jd-chip button{background:#dbeafe;border:none;color:#c0392b;font-size:15px;font-weight:800;cursor:pointer;padding:6px 9px;line-height:1;font-family:inherit;border-radius:8px}
 .jd-chip button:active{background:#c9ddfa}
 .jd-hint{width:100%;font-size:11.5px;color:#86868b;margin-top:7px}
-/* Visible native date inputs, flattened so they look like clean app pills */
-.jd-dateinput,.jd-addinput{-webkit-appearance:none;appearance:none;font-size:16px;font-family:inherit;font-weight:600;padding:8px 10px;border-radius:10px;box-sizing:border-box;line-height:1.2}
-.jd-dateinput{color:#1d6fd0;background:transparent;border:none;min-width:116px}
-.jd-addinput{color:#334155;background:#f5f5f7;border:1px dashed #b9c0cc;min-width:150px}
-.jd-dateinput::-webkit-date-and-time-value,.jd-addinput::-webkit-date-and-time-value{text-align:left;margin:0;padding:0}
-.jd-dateinput::-webkit-calendar-picker-indicator,.jd-addinput::-webkit-calendar-picker-indicator{opacity:0.55}
-.jd-addlabel{font-size:14px;font-weight:600;color:#86868b}
+/* Date fields: native inputs kept native (so iOS shows a placeholder when
+   empty), just given the app's clean field styling. */
+.form-dateinput{font-size:16px;font-family:inherit;color:#1d1d1f;background:#fff;border:1px solid #d2d2d7;border-radius:10px;padding:11px 14px;min-width:170px;max-width:100%}
+.jd-addwrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.jd-dateinput{font-size:16px;font-family:inherit;color:#1d6fd0;font-weight:600;background:transparent;border:none;padding:7px 2px 7px 10px;min-width:118px}
+.jd-addlabel{font-size:13px;font-weight:600;color:#86868b}
 .bj-sep{height:1px;background:#e5e5ea;margin:20px 0}
 /* Clean read-only grouping (view mode) */
 .bj-group{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:2px 16px;margin-bottom:16px}
@@ -615,7 +614,7 @@ textarea{resize:vertical;line-height:1.6}
       <select id="nj-stage"></select>
 
       <label class="fl">Scheduled For</label>
-      <div style="display:flex;align-items:center;gap:8px"><span class="jd-addlabel">📅 Pick a date:</span><input type="date" id="nj-sched" class="jd-addinput" style="min-width:170px"/></div>
+      <input type="date" id="nj-sched" class="form-dateinput"/>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -3613,15 +3612,15 @@ function editBoardJobField(id, field, value) {
 // the picker reliably on iPhone (an invisible/opacity:0 date input often won't).
 function jobDatesControl(o) {
   const ds = jobDates(o);
-  // The empty "add a day" picker — pick a date and it's added, then it resets.
-  const addInput = `<input type="date" class="jd-addinput" aria-label="Add a scheduled day" onchange="if(this.value){addJobScheduledDate(${o.id},this.value); this.value='';}"/>`;
+  // A full-width native date field for adding a day — picks a date, then resets.
+  const addInput = `<input type="date" class="form-dateinput" aria-label="Add a scheduled day" onchange="if(this.value){addJobScheduledDate(${o.id},this.value); this.value='';}"/>`;
   if (!ds.length) {
-    return `<div class="jd-wrap"><span class="jd-addlabel">📅 Pick a date:</span>${addInput}</div>`;
+    return `<div class="jd-addwrap"><span class="jd-addlabel">Pick a date:</span>${addInput}</div>`;
   }
   const chips = ds.map(d =>
     `<span class="jd-chip"><input type="date" class="jd-dateinput" value="${d}" onchange="if(this.value)changeJobDate(${o.id},'${d}',this.value)"/><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
   ).join('');
-  return `<div class="jd-wrap">${chips}<span class="jd-addlabel">Add:</span>${addInput}</div><div class="jd-hint">Tap a date to change it · ✕ to remove · use the empty box to add another day</div>`;
+  return `<div class="jd-wrap">${chips}</div><div class="jd-addwrap"><span class="jd-addlabel">Add another day:</span>${addInput}</div><div class="jd-hint">Tap a date to change it · ✕ to remove</div>`;
 }
 // Set a job's scheduled days explicitly. Unlike normalizeJobDates(), this does
 // NOT fall back to the legacy single date — so clearing to empty really clears
