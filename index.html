@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: photo-swipe-gallery -->
+<!-- build: polish-toasts -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -280,6 +280,9 @@ textarea{resize:vertical;line-height:1.6}
 .lb-nav{flex-shrink:0;width:46px;height:46px;border-radius:50%;border:none;background:rgba(255,255,255,0.18);color:#fff;font-size:28px;font-weight:700;line-height:1;cursor:pointer;font-family:inherit}
 .lb-nav:active{background:rgba(255,255,255,0.35)}
 .lightbox-hint{color:rgba(255,255,255,0.75);font-size:12.5px;flex-shrink:0;min-height:16px}
+/* Confirmation toast */
+.toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translate(-50%,16px);background:#1d1d1f;color:#fff;font-size:14px;font-weight:600;padding:12px 20px;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.28);z-index:300;opacity:0;pointer-events:none;transition:opacity 0.22s,transform 0.22s;max-width:86%;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
 /* Calendar */
 .cal-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid #e5e5ea}
 .cal-title{flex:1;text-align:center;font-size:17px;font-weight:800;color:#1d1d1f}
@@ -676,6 +679,9 @@ textarea{resize:vertical;line-height:1.6}
   </div>
   <div class="lightbox-hint" id="lb-hint"></div>
 </div>
+
+<!-- Brief confirmation toast -->
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <!-- Permit Required? Yes/No dialog -->
 <div class="modal-overlay" id="permit-overlay" style="display:none">
@@ -1986,6 +1992,7 @@ function saveOrder() {
   saveOrderToCloud(order); // upserts by id, so an edit replaces the cloud copy
   resetForm();
   showList();
+  toast(existing ? '✓ Work order updated' : '✓ Work order saved');
 }
 
 // Open an existing work order in the form to revise it.
@@ -2748,6 +2755,17 @@ function billingPath(type) {
 }
 function escHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+// Brief confirmation message at the bottom of the screen.
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1900);
+}
+
 function avatarFor(name) {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
   let initials = '?';
@@ -3059,6 +3077,7 @@ function calSaveEventFromForm(id) {
   }
   calRenderDaySheet();
   renderCalendar();
+  toast(id ? '✓ Event updated' : '✓ Event added');
 }
 function calDeleteEvent(id) {
   if (!confirm('Delete this event?')) return;
@@ -3296,13 +3315,17 @@ async function attachFilesToJob(files, id) {
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   if (!Array.isArray(o.attachments)) o.attachments = [];
-  for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) o.attachments.push(att); }
+  let n = 0;
+  for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) { o.attachments.push(att); n++; } }
   persistBoardJob(o);
   refreshBoardViews();
+  if (n) toast(n === 1 ? '✓ Attachment added' : '✓ ' + n + ' attachments added');
 }
 async function attachFilesToNewJob(files) {
-  for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) njAttachments.push(att); }
+  let n = 0;
+  for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) { njAttachments.push(att); n++; } }
   njRenderAttachments();
+  if (n) toast(n === 1 ? '✓ Attachment added' : '✓ ' + n + ' attachments added');
 }
 // Right-click ▸ Paste, or drag a file onto the paste box.
 function attJobPaste(e, id) { e.preventDefault(); e.stopPropagation(); const box = e.currentTarget; const f = clipboardFiles(e.clipboardData); if (box) box.textContent = ''; if (f.length) attachFilesToJob(f, id); }
@@ -3318,13 +3341,15 @@ async function handleAttachmentPick(ev, id, category) {
   if (!Array.isArray(o.attachments)) o.attachments = [];
   category = category || 'Other';
   // Process every selected file so several photos can be added at once.
+  let n = 0;
   for (let k = 0; k < files.length; k++) {
     const att = await fileToAttachment(files[k], category, k);
-    if (att) o.attachments.push(att);
+    if (att) { o.attachments.push(att); n++; }
   }
   persistBoardJob(o);
   refreshBoardViews();
   ev.target.value = '';
+  if (n) toast(n === 1 ? '✓ Attachment added' : '✓ ' + n + ' attachments added');
 }
 
 // Paste photos/files with ⌘V (or long-press → Paste on iPhone). Routes the
@@ -3694,6 +3719,7 @@ function changeJobDate(id, oldDate, newDate) {
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
+  toast('✓ Changed to ' + fmtDate(newDate));
 }
 function addJobScheduledDate(id, ds) {
   const o = boardJobs.find(x => x.id === id);
@@ -3707,6 +3733,7 @@ function addJobScheduledDate(id, ds) {
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
+  toast('✓ Scheduled for ' + fmtDate(ds));
 }
 function removeJobDate(id, ds) {
   const o = boardJobs.find(x => x.id === id);
@@ -3715,6 +3742,7 @@ function removeJobDate(id, ds) {
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
+  toast('Date removed');
 }
 // Edit the property's address from a job — saved to the property directory
 // (shared by every job at that property).
@@ -3755,6 +3783,7 @@ function moveBoardStage(id, stage) {
   persistBoardJob(o);
   seenStages[id] = normalizeStage(stage); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
+  toast('✓ Moved to ' + normalizeStage(stage));
 }
 function answerPermit(yes) {
   const id = permitJobId; permitJobId = null;
@@ -3854,12 +3883,14 @@ async function njHandleAttachmentPick(ev, category) {
   const files = ev.target.files ? Array.from(ev.target.files) : [];
   if (!files.length) return;
   // Process every selected file so several photos can be added at once.
+  let n = 0;
   for (let k = 0; k < files.length; k++) {
     const att = await fileToAttachment(files[k], category, k);
-    if (att) njAttachments.push(att);
+    if (att) { njAttachments.push(att); n++; }
   }
   njRenderAttachments();
   ev.target.value = '';
+  if (n) toast(n === 1 ? '✓ Attachment added' : '✓ ' + n + ' attachments added');
 }
 function njDeleteAttachment(attId) {
   njAttachments = njAttachments.filter(a => a.id !== attId);
@@ -4097,6 +4128,7 @@ function saveNewJob() {
   const idx = STAGES.findIndex(s => s.name === normalizeStage(stage));
   const canvas = document.getElementById('board-canvas');
   if (canvas && canvas.children[idx]) canvas.children[idx].scrollIntoView({ behavior:'smooth', inline:'start', block:'nearest' });
+  toast('✓ Job added');
 }
 
 // ── INIT ──────────────────────────────────────────────────
