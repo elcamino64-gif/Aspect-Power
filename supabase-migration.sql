@@ -168,3 +168,17 @@ drop policy if exists calendar_events_authed on calendar_events;
 create policy calendar_events_authed on calendar_events
   for all to authenticated using (true) with check (true);
 grant all on calendar_events to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Calendar job order: the manual top-to-bottom order jobs run on a given day
+-- (set with the ▲▼ arrows in a day's view). One row per day. Run this once so
+-- the order syncs across every device.
+-- ---------------------------------------------------------------------------
+create table if not exists calendar_order (
+  date     text primary key,
+  job_ids  jsonb default '[]'::jsonb
+);
+alter table calendar_order enable row level security;
+drop policy if exists calendar_order_all on calendar_order;
+create policy calendar_order_all on calendar_order for all using (true) with check (true);
+grant all on calendar_order to anon, authenticated;
