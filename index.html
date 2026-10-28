@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: inapp-pinch-zoom -->
+<!-- build: crew-viewer-calorder -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -250,6 +250,25 @@ textarea{resize:vertical;line-height:1.6}
 .navtrio{display:flex;gap:6px;flex-wrap:wrap;width:100%;justify-content:center}
 .navtrio .btn-ghost{padding:7px 13px;font-size:13px}
 .navtrio .btn-ghost.on{background:#2e97f2;border-color:#2e97f2;color:#fff}
+/* Viewer (limited login): hide Work Orders, New buttons, and all edit controls */
+body.viewer .nav-work-orders{display:none}
+body.viewer .add-new-sm{display:none}
+body.viewer .bj-edit-btn{display:none}
+body.viewer .viewer-hide{display:none !important}
+/* Assigned-crew chips (pickable) and avatars (read-only) */
+.crew-pick{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 4px}
+.crew-chip{border:1.5px solid #d8d8dd;background:#fff;color:#1d1d1f;font-size:14px;font-weight:600;padding:8px 15px;border-radius:999px;cursor:pointer;font-family:inherit}
+.crew-chip.on{background:var(--cc);border-color:var(--cc);color:#fff}
+.crew-avatars{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.crew-av{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:#fff;font-size:11px;font-weight:700;line-height:1}
+.crew-names{color:#1d1d1f}
+/* Calendar day-sheet reorder arrows */
+.cal-li{display:flex;align-items:center;gap:10px}
+.cal-li-move{display:flex;flex-direction:column;gap:2px;flex:none}
+.cal-mv{width:26px;height:20px;border:1px solid #d8d8dd;background:#fff;color:#2e97f2;border-radius:6px;font-size:11px;line-height:1;cursor:pointer;padding:0;font-family:inherit}
+.cal-mv:disabled{color:#c7c7cc;cursor:default}
+.cal-reorder-hint{font-size:11px;color:#86868b;margin:2px 2px 8px}
+.jd-chip-ro{display:inline-block;background:#f2f2f7;color:#1d1d1f;border-radius:8px;padding:6px 11px;font-size:14px;margin:0 6px 6px 0}
 .add-new-sm{border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:13px;font-weight:600;padding:7px 14px;border-radius:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
 .contact-link{color:#2e97f2;font-size:12.5px;font-weight:600;text-decoration:none;white-space:nowrap;cursor:pointer}
 .contact-link.contact-email,.contact-link.contact-address{white-space:normal;word-break:break-all;display:inline-block;max-width:100%}
@@ -387,7 +406,7 @@ textarea{resize:vertical;line-height:1.6}
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
         <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
-        <button class="btn-ghost on" id="btn-to-list" onclick="showList()">Work Orders<span id="order-count" style="display:none"></span></button>
+        <button class="btn-ghost on nav-work-orders" id="btn-to-list" onclick="showList()">Work Orders<span id="order-count" style="display:none"></span></button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
     </div>
@@ -504,7 +523,7 @@ textarea{resize:vertical;line-height:1.6}
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
         <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
-        <button class="btn-ghost on" onclick="showList()">Work Orders</button>
+        <button class="btn-ghost on nav-work-orders" onclick="showList()">Work Orders</button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
     </div>
@@ -542,7 +561,7 @@ textarea{resize:vertical;line-height:1.6}
       <div class="navtrio">
         <button class="btn-ghost on" onclick="showBoard()">▦ Board</button>
         <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
-        <button class="btn-ghost" onclick="showList()">Work Orders</button>
+        <button class="btn-ghost nav-work-orders" onclick="showList()">Work Orders</button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
     </div>
@@ -565,7 +584,7 @@ textarea{resize:vertical;line-height:1.6}
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
         <button class="btn-ghost on" onclick="showCalendar()">📅 Calendar</button>
-        <button class="btn-ghost" onclick="showList()">Work Orders</button>
+        <button class="btn-ghost nav-work-orders" onclick="showList()">Work Orders</button>
         <button class="btn-ghost" onclick="showContacts()">📇 Contacts</button>
       </div>
     </div>
@@ -605,7 +624,7 @@ textarea{resize:vertical;line-height:1.6}
       <div class="navtrio">
         <button class="btn-ghost" onclick="showBoard()">▦ Board</button>
         <button class="btn-ghost" onclick="showCalendar()">📅 Calendar</button>
-        <button class="btn-ghost" onclick="showList()">Work Orders</button>
+        <button class="btn-ghost nav-work-orders" onclick="showList()">Work Orders</button>
         <button class="btn-ghost on" onclick="showContacts()">📇 Contacts</button>
       </div>
     </div>
@@ -623,6 +642,9 @@ textarea{resize:vertical;line-height:1.6}
 
       <label class="fl">Scheduled For</label>
       <input type="date" id="nj-sched" class="form-dateinput"/>
+
+      <label class="fl">Assigned Crew</label>
+      <div id="nj-assigned"></div>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -712,6 +734,49 @@ function saveAuthSession(){
 // Token used for every Supabase request: the signed-in user's token if we have
 // one, otherwise the anon key (works until the database is locked down).
 function bearer(){ return (authSession && authSession.access_token) ? authSession.access_token : SUPABASE_KEY; }
+
+// ── Crew (the people you can assign to a job) ─────────────────────────────
+const CREW = ['Patrick', 'Troy', 'Jose'];
+const CREW_COLORS = { Patrick:'#2E97F2', Troy:'#8257E6', Jose:'#F5A623' };
+function crewColor(name){ return CREW_COLORS[name] || '#86868B'; }
+function crewInitials(name){ return (name || '').trim().charAt(0).toUpperCase(); }
+function jobAssigned(o){ return (Array.isArray(o.assigned) ? o.assigned : []).filter(n => CREW.includes(n)); }
+// Small colored circles with each assigned person's initial (read-only display).
+function crewAvatars(list){
+  const l = (list || []).filter(n => CREW.includes(n));
+  if (!l.length) return '';
+  return `<div class="crew-avatars">${l.map(n => `<span class="crew-av" style="background:${crewColor(n)}" title="${escHtml(n)}">${crewInitials(n)}</span>`).join('')}</div>`;
+}
+
+// ── Access level ──────────────────────────────────────────────────────────
+// A "viewer" login (schedule + job details only) is marked on its Supabase
+// user with metadata {"role":"viewer"}. Viewers get no Work Orders tab, no
+// Contract attachments, and a fully read-only app. Everyone else has full
+// access. This is a convenience restriction in the app, not database security.
+function decodeJwt(token){
+  try {
+    let p = (token || '').split('.')[1] || '';
+    p = p.replace(/-/g, '+').replace(/_/g, '/');
+    p += '==='.slice((p.length + 3) % 4);
+    return JSON.parse(atob(p));
+  } catch(e){ return null; }
+}
+function currentRole(){
+  if (!authSession || !authSession.access_token) return 'full';
+  const p = decodeJwt(authSession.access_token);
+  const r = p && ((p.user_metadata && p.user_metadata.role) || (p.app_metadata && p.app_metadata.role));
+  return String(r || '').toLowerCase() === 'viewer' ? 'viewer' : 'full';
+}
+function isViewer(){ return currentRole() === 'viewer'; }
+// Attachments a viewer is allowed to see (Contracts are hidden from viewers).
+function visibleAtts(o){
+  const atts = Array.isArray(o.attachments) ? o.attachments : [];
+  return isViewer() ? atts.filter(a => (a.category || 'Other') !== 'Contract') : atts;
+}
+// Flip the body.viewer class so CSS can hide restricted / edit-only controls.
+function applyAccessMode(){
+  if (document && document.body) document.body.classList.toggle('viewer', isViewer());
+}
 
 async function signIn(email, password){
   const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
@@ -2818,7 +2883,10 @@ function jobIsComplete(o){ return normalizeStage(o.status) === 'Complete — Rea
 function jobShownDates(o){ return jobIsComplete(o) ? [] : jobDates(o); }
 function jobToRow(j){
   const ds = jobDates(j);
-  return { id:j.id, park:j.park, type:j.type, stage:j.status, technician:j.by,
+  return { id:j.id, park:j.park, type:j.type, stage:j.status,
+    // The board_jobs.technician column now holds the assigned crew (CSV), so
+    // assignees sync without needing a new database column.
+    technician: jobAssigned(j).join(',') || null,
     location:j.spaceLocation, description:j.description, amount:j.total,
     status_tag:j.statusTag, contact:packContact(j), notes:j.otherNotes,
     checklist:j.checklist, attachments:j.attachments || [],
@@ -2829,7 +2897,10 @@ function jobToRow(j){
 function rowToJob(r){
   const csv = String(r.scheduled_date || '').split(',').map(s => s.trim()).filter(Boolean);
   const o = { id:r.id, park:r.park||'', type:r.type||'service', status:r.stage||'Inquiries',
-    by:r.technician||'', spaceLocation:r.location||'', description:r.description||'',
+    by:r.technician||'',
+    // Assigned crew is stored comma-separated in the technician column.
+    assigned: String(r.technician||'').split(',').map(s => s.trim()).filter(n => CREW.includes(n)),
+    spaceLocation:r.location||'', description:r.description||'',
     total:parseFloat(r.amount)||0, statusTag:r.status_tag||'',
     ...unpackContact(r.contact),
     otherNotes:r.notes||'', date:r.created_at ? String(r.created_at).slice(0,10) : '',
@@ -2897,6 +2968,49 @@ function saveCalEventsLocal(){ try { localStorage.setItem('calEvents', JSON.stri
 function markCalEventSynced(id){ calEventsSynced[String(id)] = 1; try { localStorage.setItem('calEventsSynced', JSON.stringify(calEventsSynced)); } catch(e){} }
 function unmarkCalEventSynced(id){ delete calEventsSynced[String(id)]; try { localStorage.setItem('calEventsSynced', JSON.stringify(calEventsSynced)); } catch(e){} }
 function calEventsOn(ds){ return calEvents.filter(e => (e.date||'') === ds).sort((a,b)=>(a.title||'').localeCompare(b.title||'')); }
+
+// ── Calendar job order (manual per-day ordering of jobs) ──────────────────
+// calOrder maps 'YYYY-MM-DD' → [jobId, jobId, …] — the order jobs run that day.
+// Jobs not listed fall to the bottom (by park name). Synced via calendar_order.
+let calOrder = {};
+try { calOrder = JSON.parse(localStorage.getItem('calOrder') || '{}'); } catch(e){ calOrder = {}; }
+function saveCalOrderLocal(){ try { localStorage.setItem('calOrder', JSON.stringify(calOrder)); } catch(e){} }
+async function saveCalOrderToCloud(ds, ids){
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/calendar_order', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + bearer(),
+        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ date: ds, job_ids: ids })
+    });
+  } catch(e){ console.error('saveCalOrderToCloud failed (saved locally):', e); }
+}
+async function loadCalOrderFromCloud(){
+  try {
+    const rows = await sbFetch('calendar_order');
+    if (rows && rows.length !== undefined) {
+      const m = {};
+      rows.forEach(r => { if (r && r.date) m[r.date] = Array.isArray(r.job_ids) ? r.job_ids.map(Number) : []; });
+      calOrder = m;
+      saveCalOrderLocal();
+      if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
+    }
+  } catch(e){ console.error('loadCalOrderFromCloud failed (using local order):', e); }
+}
+// Move a job up/down in a day's running order (dir = -1 up, +1 down).
+function calMoveJob(ds, id, dir){
+  if (isViewer()) return;
+  const ids = calJobsOn(ds).map(o => o.id);
+  const i = ids.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ids.length) return;
+  ids.splice(j, 0, ids.splice(i, 1)[0]);
+  calOrder[ds] = ids;
+  saveCalOrderLocal();
+  saveCalOrderToCloud(ds, ids);
+  calRenderDaySheet();
+  renderCalendar();
+}
 async function loadCalEventsFromCloud(){
   let rows = null;
   try { rows = await sbFetch('calendar_events?order=created_at.desc'); }
@@ -3030,6 +3144,7 @@ function openCalDay(ds) {
 function closeCalDay() { document.getElementById('cal-day-overlay').classList.remove('show'); }
 function calRenderDaySheet() {
   const ds = calDaySheetDate;
+  if (!ds) return;
   const [Y, Mo, D] = ds.split('-').map(Number);
   const dt = new Date(Y, Mo-1, D);
   document.getElementById('cal-day-title').textContent = `${CAL_WD_FULL[dt.getDay()]}, ${CAL_MONTHS[Mo-1]} ${D}`;
@@ -3040,18 +3155,29 @@ function calRenderDaySheet() {
   b += evs.map(e =>
     `<div class="cal-ev-li">
        <div class="cal-ev-li-main" onclick="calShowEventForm('${e.id}')"><div class="cal-ev-li-title">📌 ${escHtml(e.title||'Event')}</div>${e.note?`<div class="cal-li-sub">${escHtml(e.note)}</div>`:''}</div>
-       <button class="cal-ev-del" onclick="calDeleteEvent('${e.id}')">✕</button>
+       <button class="cal-ev-del viewer-hide" onclick="calDeleteEvent('${e.id}')">✕</button>
      </div>`).join('');
-  b += jobs.map(o =>
-      `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
-        <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}</div>
+  const canReorder = !isViewer() && jobs.length > 1;
+  if (canReorder) b += `<div class="cal-reorder-hint">▲▼ sets the order jobs run this day (first at top)</div>`;
+  b += jobs.map((o, idx) => {
+      const move = canReorder
+        ? `<div class="cal-li-move">
+             <button class="cal-mv" ${idx===0?'disabled':''} onclick="event.stopPropagation();calMoveJob('${ds}',${o.id},-1)">▲</button>
+             <button class="cal-mv" ${idx===jobs.length-1?'disabled':''} onclick="event.stopPropagation();calMoveJob('${ds}',${o.id},1)">▼</button>
+           </div>`
+        : '';
+      return `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
+        ${move}
+        <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}${crewAvatars(o.assigned)}</div>
         <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   if (!evs.length && !jobs.length && !hol) b += '<div class="cal-empty">Nothing on this day yet.</div>';
-  b += `<button class="cal-add-ev" onclick="calShowEventForm(null)">＋ Add event</button>`;
+  if (!isViewer()) b += `<button class="cal-add-ev" onclick="calShowEventForm(null)">＋ Add event</button>`;
   document.getElementById('cal-day-body').innerHTML = b;
 }
 function calShowEventForm(id) {
+  if (isViewer()) return;
   const ev = id ? calEvents.find(e => String(e.id) === String(id)) : null;
   document.getElementById('cal-day-body').innerHTML = `
     <div class="cal-ev-form">
@@ -3065,6 +3191,7 @@ function calShowEventForm(id) {
   const t = document.getElementById('cal-ev-title'); if (t) t.focus();
 }
 function calSaveEventFromForm(id) {
+  if (isViewer()) return;
   const title = (document.getElementById('cal-ev-title').value || '').trim();
   const note = (document.getElementById('cal-ev-note').value || '').trim();
   if (!title) { alert('Please enter a title for the event.'); return; }
@@ -3080,6 +3207,7 @@ function calSaveEventFromForm(id) {
   toast(id ? '✓ Event updated' : '✓ Event added');
 }
 function calDeleteEvent(id) {
+  if (isViewer()) return;
   if (!confirm('Delete this event?')) return;
   const ev = calEvents.find(e => String(e.id) === String(id));
   calEvents = calEvents.filter(e => String(e.id) !== String(id));
@@ -3092,8 +3220,16 @@ function calDeleteEvent(id) {
 function calJobsOn(ds) {
   // The calendar shows ALL scheduled jobs, including completed ones, so past
   // work stays on the calendar for review (completed jobs render green).
+  // Jobs follow the manual order set for this day (calOrder); any not placed
+  // yet fall to the bottom, ordered by park name.
+  const order = calOrder[ds] || [];
+  const pos = id => { const i = order.indexOf(id); return i === -1 ? 1e9 : i; };
   return boardJobs.filter(o => jobDates(o).includes(ds))
-    .sort((a,b) => (a.park||'').localeCompare(b.park||''));
+    .sort((a,b) => {
+      const pa = pos(a.id), pb = pos(b.id);
+      if (pa !== pb) return pa - pb;
+      return (a.park||'').localeCompare(b.park||'');
+    });
 }
 
 function calMonthBlock(y, m, todayStr) {
@@ -3163,6 +3299,7 @@ function boardCardHtml(o) {
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
     ${(()=>{const ds=jobShownDates(o);return ds.length?`<div class="board-card-meta"><span class="board-sched">📅 ${fmtDate(ds[0])}${ds.length>1?` +${ds.length-1} more`:''}</span></div>`:'';})()}
+    ${crewAvatars(o.assigned)}
     ${tagHtml?`<div class="board-card-tagrow">${tagHtml}</div>`:''}
     ${boardDetailHtml(o)}
   </div>`;
@@ -3231,7 +3368,7 @@ function attAdderHtml(mode, id) {
 }
 
 function attachmentsHtml(o, editable) {
-  const atts = Array.isArray(o.attachments) ? o.attachments : [];
+  const atts = visibleAtts(o);
   let h = '';
   ATT_CATS.forEach(cat => {
     const items = atts.filter(a => (a.category || 'Other') === cat);
@@ -3241,7 +3378,7 @@ function attachmentsHtml(o, editable) {
   if (editable) {
     h += attAdderHtml('job', o.id);
   } else if (!atts.length) {
-    h += `<div class="att-empty">No attachments yet. Tap Edit to add.</div>`;
+    h += `<div class="att-empty">${isViewer() ? 'No attachments.' : 'No attachments yet. Tap Edit to add.'}</div>`;
   }
   return h;
 }
@@ -3312,6 +3449,7 @@ function dtFiles(dt) { const files = []; if (dt && dt.files) { for (const f of d
 // Pasted/dropped items file themselves under Pictures (images) or Other.
 function autoCat(file) { return (file.type && file.type.indexOf('image/') === 0) ? 'Pictures' : 'Other'; }
 async function attachFilesToJob(files, id) {
+  if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   if (!Array.isArray(o.attachments)) o.attachments = [];
@@ -3334,6 +3472,7 @@ function njAttPaste(e) { e.preventDefault(); e.stopPropagation(); const box = e.
 function njAttDrop(e) { e.preventDefault(); e.stopPropagation(); if (e.currentTarget) e.currentTarget.classList.remove('drag'); const f = dtFiles(e.dataTransfer); if (f.length) attachFilesToNewJob(f); }
 
 async function handleAttachmentPick(ev, id, category) {
+  if (isViewer()) { ev.target.value = ''; return; }
   const files = ev.target.files ? Array.from(ev.target.files) : [];
   if (!files.length) return;
   const o = boardJobs.find(x => x.id === id);
@@ -3501,7 +3640,7 @@ document.addEventListener('keydown', (e) => {
 
 function openAttachment(jobId, attId) {
   const o = boardJobs.find(x => x.id === jobId);
-  const atts = o && Array.isArray(o.attachments) ? o.attachments : [];
+  const atts = o ? visibleAtts(o) : [];
   const a = atts.find(x => x.id === attId);
   if (!a) return;
   // Images open in a swipeable in-app gallery of this job's photos.
@@ -3528,7 +3667,9 @@ function boardDetailHtml(o) {
     h += `<div class="drow"><span class="k">Contact</span><span class="v">${v}</span></div>`;
   }
   if (o.otherNotes) h += `<div class="drow"><span class="k">Notes</span><span class="v">${escHtml(o.otherNotes)}</span></div>`;
-  const atts = Array.isArray(o.attachments) ? o.attachments : [];
+  const asg = jobAssigned(o);
+  if (asg.length) h += `<div class="drow"><span class="k">Assigned</span><span class="v crew-names">${asg.map(escHtml).join(', ')}</span></div>`;
+  const atts = visibleAtts(o);
   if (atts.length) {
     const chips = atts.map(a => {
       const isImg = a.type && a.type.indexOf('image/') === 0;
@@ -3538,11 +3679,15 @@ function boardDetailHtml(o) {
     }).join('');
     h += `<div class="drow"><span class="k">Files</span><span class="v"><div class="att-chips">${chips}</div></span></div>`;
   }
-  const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
-  h += `<div class="move-row"><span class="k">Stage</span><select class="move-sel" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select></div>`;
+  if (isViewer()) {
+    h += `<div class="move-row"><span class="k">Stage</span><span class="v" style="color:${stageColor(o.status)};font-weight:600">${escHtml(normalizeStage(o.status))}</span></div>`;
+  } else {
+    const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
+    h += `<div class="move-row"><span class="k">Stage</span><select class="move-sel" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select></div>`;
+  }
   h += `<div class="board-actions">
       <button class="board-open-link" onclick="showBoardJob(${o.id})">Open full view →</button>
-      <button class="remove-link" onclick="removeBoardJob(${o.id})">Remove job</button>
+      <button class="remove-link viewer-hide" onclick="removeBoardJob(${o.id})">Remove job</button>
     </div></div>`;
   return h;
 }
@@ -3639,7 +3784,7 @@ function showBoardJob(id, from) {
   renderBoardJob(id);
 }
 function backFromBoardJob() { if (boardJobOrigin === 'calendar') showCalendar(); else showBoard(); }
-function editBoardJob(id){ boardJobEditMode = true; renderBoardJob(id); }
+function editBoardJob(id){ if (isViewer()) return; boardJobEditMode = true; renderBoardJob(id); }
 function doneEditBoardJob(id){ boardJobEditMode = false; renderBoardJob(id); }
 
 function renderBoardJob(id) {
@@ -3670,6 +3815,8 @@ function renderBoardJob(id) {
       ${jobDatesControl(o)}
       <label class="fl">Stage</label>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
+      <label class="fl">Assigned Crew</label>
+      <div class="crew-pick">${CREW.map(name => `<button type="button" class="crew-chip${jobAssigned(o).includes(name)?' on':''}" style="--cc:${crewColor(name)}" onclick="toggleJobAssignee(${o.id},'${name}')">${escHtml(name)}</button>`).join('')}</div>
       <label class="fl">Job Location</label>
       <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
       <label class="fl">Description</label>
@@ -3686,12 +3833,16 @@ function renderBoardJob(id) {
     const row = (l, v, muted) => `<div class="bj-row"><div class="l">${l}</div><div class="v${muted?' muted':''}">${v}</div></div>`;
     // Scheduling is available right here, without tapping Edit.
     const schedControl = jobDatesControl(o);
-    // Stage is changeable right here, without tapping Edit.
-    const stageControl = `<select class="bj-stage-sel" onchange="moveBoardStage(${o.id}, this.value)">${STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('')}</select>`;
+    // Stage is changeable right here, without tapping Edit (read-only for viewers).
+    const stageControl = isViewer()
+      ? `<span style="color:${stageColor(o.status)};font-weight:600">${escHtml(normalizeStage(o.status))}</span>`
+      : `<select class="bj-stage-sel" onchange="moveBoardStage(${o.id}, this.value)">${STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('')}</select>`;
+    const asg = jobAssigned(o);
     top = `
       <div class="bj-group">
         <div class="bj-row"><div class="l">Scheduled</div><div class="v">${schedControl}</div></div>
-        <div class="bj-row"><div class="l">Stage</div><div class="v">${stageControl}</div></div>`;
+        <div class="bj-row"><div class="l">Stage</div><div class="v">${stageControl}</div></div>
+        <div class="bj-row"><div class="l">Assigned</div><div class="v${asg.length?' crew-names':' muted'}">${asg.length?asg.map(escHtml).join(', '):'—'}</div></div>`;
     top += `
         ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
         ${o.description ? `<div class="bj-row"><div class="l">Description</div><div class="v" style="white-space:pre-wrap">${escHtml(o.description)}</div></div>` : ''}
@@ -3710,13 +3861,26 @@ function renderBoardJob(id) {
     <label class="fl" style="margin-top:22px">Attachments</label>
     ${attachmentsHtml(o, boardJobEditMode)}
     ${boardJobEditMode ? `<button class="btn-primary" style="width:100%;margin-top:22px" onclick="doneEditBoardJob(${o.id})">✓ Done</button>` : ''}
-    <button class="btn-ghost" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
+    <button class="btn-ghost viewer-hide" style="width:100%;color:#ff3b30;border-color:#ff3b30;margin-top:16px" onclick="removeBoardJob(${o.id})">Remove job</button>
     <div style="height:32px"></div>
   `;
 }
 
+// Toggle a crew member on/off a job (auto-saves).
+function toggleJobAssignee(id, name) {
+  if (isViewer()) return;
+  const o = boardJobs.find(x => x.id === id);
+  if (!o || !CREW.includes(name)) return;
+  const cur = jobAssigned(o);
+  o.assigned = cur.includes(name) ? cur.filter(n => n !== name) : [...cur, name];
+  persistBoardJob(o);
+  refreshBoardViews();
+  renderBoardJob(id);
+}
+
 // Edit a single field on a board job (auto-saves).
 function editBoardJobField(id, field, value) {
+  if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   if (field === 'total') o.total = parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
@@ -3744,6 +3908,10 @@ function editBoardJobField(id, field, value) {
 // the picker reliably on iPhone (an invisible/opacity:0 date input often won't).
 function jobDatesControl(o) {
   const ds = jobDates(o);
+  if (isViewer()) {
+    if (!ds.length) return `<span class="muted" style="color:#86868b">Not scheduled</span>`;
+    return `<div class="jd-wrap">${ds.map(d => `<span class="jd-chip-ro">${fmtDate(d)}</span>`).join('')}</div>`;
+  }
   // A full-width native date field for adding a day — picks a date, then resets.
   const addInput = `<input type="date" class="form-dateinput" aria-label="Add a scheduled day" onchange="if(this.value){addJobScheduledDate(${o.id},this.value); this.value='';}"/>`;
   if (!ds.length) {
@@ -3765,6 +3933,7 @@ function setJobDates(o, list) {
 }
 // Replace one scheduled day with another (tap a date chip to change it).
 function changeJobDate(id, oldDate, newDate) {
+  if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   setJobDates(o, [...jobDates(o).filter(d => d !== oldDate), newDate]);
@@ -3774,6 +3943,7 @@ function changeJobDate(id, oldDate, newDate) {
   toast('✓ Changed to ' + fmtDate(newDate));
 }
 function addJobScheduledDate(id, ds) {
+  if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   setJobDates(o, [...jobDates(o), ds]);
@@ -3788,6 +3958,7 @@ function addJobScheduledDate(id, ds) {
   toast('✓ Scheduled for ' + fmtDate(ds));
 }
 function removeJobDate(id, ds) {
+  if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   setJobDates(o, jobDates(o).filter(d => d !== ds));
@@ -3822,6 +3993,7 @@ function refreshBoardViews() {
 
 let permitJobId = null;
 function moveBoardStage(id, stage) {
+  if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
   // Moving Inquiries/Approved → Scheduled: ask whether a permit is required first
@@ -3882,6 +4054,7 @@ function removeChecklistItem(id, i) {
   refreshBoardViews();
 }
 function removeBoardJob(id) {
+  if (isViewer()) return;
   if (!confirm('Remove this job from the board?')) return;
   boardJobs = boardJobs.filter(o => o.id !== id);
   saveBoardJobsLocal();
@@ -3893,6 +4066,18 @@ function removeBoardJob(id) {
 
 // ── New Job bottom sheet ──────────────────────────────────
 let njType = 'project';
+let njAssigned = [];
+function njRenderAssigned(){
+  const el = document.getElementById('nj-assigned');
+  if (!el) return;
+  el.innerHTML = `<div class="crew-pick">${CREW.map(name =>
+    `<button type="button" class="crew-chip${njAssigned.includes(name)?' on':''}" style="--cc:${crewColor(name)}" onclick="njToggleAssignee('${name}')">${escHtml(name)}</button>`
+  ).join('')}</div>`;
+}
+function njToggleAssignee(name){
+  njAssigned = njAssigned.includes(name) ? njAssigned.filter(n => n !== name) : [...njAssigned, name];
+  njRenderAssigned();
+}
 function njSetType(t) {
   njType = t || 'project';
   const njStage = document.getElementById('nj-stage');
@@ -3908,6 +4093,8 @@ function openNewJob() {
   njPropChange(); // resets the contact dropdown + address hint for the (empty) property
   njAttachments = [];
   njRenderAttachments();
+  njAssigned = [];
+  njRenderAssigned();
   document.getElementById('nj-overlay').classList.add('show');
 }
 
@@ -4036,7 +4223,7 @@ function renderContacts() {
 }
 let contactsEditMode = false;
 function selectContactProperty(name){ contactsSelected = name; contactsEditMode = false; renderContactsDetail(); }
-function editContacts(){ contactsEditMode = true; renderContactsDetail(); }
+function editContacts(){ if (isViewer()) return; contactsEditMode = true; renderContactsDetail(); }
 function doneEditContacts(){ saveContactsProperty(); contactsEditMode = false; renderContactsDetail(); }
 function renderContactsDetail() {
   const el = document.getElementById('contacts-detail');
@@ -4059,7 +4246,7 @@ function renderContactsDetail() {
       ${row('Address', addr ? `<a class="contact-link contact-address" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}">📍 ${escHtml(addr)}</a>` : '—', !addr)}
       ${contactRows}
     </div>
-    <button class="btn-primary" onclick="editContacts()">✏️ Edit property &amp; contacts</button>`;
+    <button class="btn-primary viewer-hide" onclick="editContacts()">✏️ Edit property &amp; contacts</button>`;
     return;
   }
 
@@ -4143,6 +4330,7 @@ function createWorkOrderFromJob(job) {
 }
 
 function saveNewJob() {
+  if (isViewer()) return;
   const byEl = document.getElementById('nj-by');
   const by = byEl ? byEl.value : '';
   const park = document.getElementById('nj-park').value;
@@ -4153,7 +4341,7 @@ function saveNewJob() {
   // A new job created with a scheduled date starts in the Scheduled stage.
   const stage = njSchedVal ? 'Scheduled' : (document.getElementById('nj-stage').value || 'Inquiries');
   const job = {
-    id: Date.now(), date: dateStr, by, park,
+    id: Date.now(), date: dateStr, by, park, assigned: njAssigned.slice(),
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
     status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
@@ -4174,6 +4362,7 @@ function saveNewJob() {
     upsertPropertyContact(park, { name: job.contact, title: job.contactTitle, phone: job.contactPhone, email: job.contactEmail });
   }
   njAttachments = [];
+  njAssigned = [];
   expandedBoardId = job.id;
   closeNewJob();
   showBoard();
@@ -4231,6 +4420,7 @@ function initApp() {
   normalizePropertyInfo();
   rebuildTitleDatalist();
   reconcileContacts(); // backfill from whatever is cached locally right away
+  applyAccessMode();   // apply viewer restrictions before the first paint
   // Paint the cached Job Board immediately — no waiting on the network.
   showBoard();
   // Then refresh the token and sync from the cloud in the background, so the
@@ -4242,6 +4432,7 @@ function initApp() {
     await loadPropertyInfoFromCloud();
     await loadBoardJobsFromCloud();
     await loadCalEventsFromCloud();
+    await loadCalOrderFromCloud();
     reconcileContacts();
     if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   })();
@@ -4266,6 +4457,7 @@ async function submitLogin(){
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
     await signIn(email, pass);
+    applyAccessMode();
     hideLogin();
     startAppOnce();
   } catch(e){
