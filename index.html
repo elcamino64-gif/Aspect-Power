@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: crew-viewer-calorder -->
+<!-- build: polish-loading-offline -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -160,7 +160,19 @@ textarea{resize:vertical;line-height:1.6}
 .board-ava{width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .board-tag{font-size:10.5px;font-weight:600;letter-spacing:0.2px;padding:3px 8px;border-radius:6px}
 .board-card-amt{margin-left:auto;font-size:14px;font-weight:700;color:#1d1d1f}
-.board-empty{font-size:13px;color:#86868b;font-style:italic;padding:4px 2px}
+.board-empty{font-size:13px;color:#c7c7cc;padding:4px 2px}
+/* Whole-board loading / blank states */
+.board-emptywrap{display:flex;align-items:center;justify-content:center;width:100%;min-height:50vh;padding:24px}
+.board-loading{color:#86868b;font-size:15px;font-weight:500}
+.board-loading::before{content:'';display:inline-block;width:15px;height:15px;margin-right:9px;vertical-align:-2px;border:2px solid #d8d8dd;border-top-color:#2e97f2;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.board-blank{text-align:center;max-width:320px}
+.board-blank-emoji{font-size:44px;margin-bottom:10px}
+.board-blank-title{font-size:19px;font-weight:700;color:#1d1d1f;margin-bottom:6px}
+.board-blank-sub{font-size:14px;color:#86868b;line-height:1.5}
+/* Offline banner */
+.offline-bar{position:fixed;left:0;right:0;bottom:0;background:#8a6d1a;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:9px 16px calc(9px + env(safe-area-inset-bottom));z-index:260;transform:translateY(110%);transition:transform 0.25s;line-height:1.35}
+.offline-bar.show{transform:translateY(0)}
 .board-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px solid #e5e5ea}
 .board-card.open .board-detail{display:block}
 .drow{display:block;font-size:13px;margin-bottom:11px;line-height:1.4}
@@ -704,6 +716,7 @@ body.viewer .viewer-hide{display:none !important}
 
 <!-- Brief confirmation toast -->
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="offline-bar" class="offline-bar" role="status" aria-live="polite">⚠︎ Offline — your changes are saved on this phone and will sync when you reconnect.</div>
 
 <!-- Permit Required? Yes/No dialog -->
 <div class="modal-overlay" id="permit-overlay" style="display:none">
@@ -2637,6 +2650,9 @@ const STAGES = [
 ];
 let boardJobs = [];
 try { boardJobs = JSON.parse(localStorage.getItem('boardJobs') || '[]'); } catch(e){}
+// Becomes true once the first cloud load finishes (success or failure), so an
+// empty board can tell "still loading" apart from "genuinely no jobs".
+let boardLoaded = false;
 let boardFilter = 'all';
 
 // ── "NEW / status changed" markers (per DEVICE) ─────────────────────────────
@@ -2926,6 +2942,7 @@ async function loadBoardJobsFromCloud(){
   } catch(e) {
     console.error('loadBoardJobsFromCloud failed (using local board):', e);
   }
+  boardLoaded = true;
   ensureSeenBaseline(ok);
   if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
@@ -3712,6 +3729,24 @@ function renderBoard() {
   updateBoardCount();
   const prevX = scroller.scrollLeft, prevY = scroller.scrollTop;
   const visible = boardJobs.filter(o => boardFilter === 'all' || (o.type || 'service') === boardFilter);
+  // Whole-board states: still loading, truly empty, or filtered to nothing.
+  if (!visible.length) {
+    let msg;
+    if (!boardLoaded && !boardJobs.length) {
+      msg = `<div class="board-loading">Loading your jobs…</div>`;
+    } else if (!boardJobs.length) {
+      msg = `<div class="board-blank"><div class="board-blank-emoji">🗂️</div><div class="board-blank-title">No jobs yet</div><div class="board-blank-sub">${isViewer() ? 'Jobs will appear here once they\'re added.' : 'Tap <b>+ New Job</b> below to add your first one.'}</div></div>`;
+    } else {
+      msg = `<div class="board-blank"><div class="board-blank-sub">No ${boardFilter === 'project' ? 'project' : 'service'} jobs right now. Tap <b>All</b> to see everything.</div></div>`;
+    }
+    canvas.classList.remove('compact');
+    canvas.style.transform = 'scale(1)';
+    canvas.innerHTML = `<div class="board-emptywrap">${msg}</div>`;
+    const sizer = document.getElementById('board-sizer');
+    if (sizer) { sizer.style.width = '100%'; sizer.style.height = 'auto'; }
+    scroller.scrollLeft = 0; scroller.scrollTop = 0;
+    return;
+  }
   canvas.innerHTML = STAGES.map(stage => {
     const cards = visible.filter(o => normalizeStage(o.status) === stage.name)
       // Sort by Scheduled For, soonest date at the top; undated jobs last.
@@ -3729,7 +3764,7 @@ function renderBoard() {
         <span class="board-col-count">${cards.length}</span>
       </div>
       <div class="board-cards">
-        ${cards.length ? cards.map(boardCardHtml).join('') : '<div class="board-empty">Nothing here.</div>'}
+        ${cards.length ? cards.map(boardCardHtml).join('') : '<div class="board-empty">—</div>'}
       </div>
     </div>`;
   }).join('');
@@ -4421,6 +4456,7 @@ function initApp() {
   rebuildTitleDatalist();
   reconcileContacts(); // backfill from whatever is cached locally right away
   applyAccessMode();   // apply viewer restrictions before the first paint
+  updateOnlineStatus();
   // Paint the cached Job Board immediately — no waiting on the network.
   showBoard();
   // Then refresh the token and sync from the cloud in the background, so the
@@ -4466,6 +4502,20 @@ async function submitLogin(){
     btn.disabled = false; btn.textContent = 'Sign In';
   }
 }
+// Offline awareness: show a reassuring banner when the phone loses its
+// connection, so people know their changes are kept locally until it's back.
+function updateOnlineStatus(){
+  const bar = document.getElementById('offline-bar');
+  if (!bar) return;
+  const offline = (typeof navigator !== 'undefined') && navigator.onLine === false;
+  bar.classList.toggle('show', offline);
+  // Coming back online: pull the latest from the cloud so devices reconcile.
+  if (!offline && window._wasOffline) { try { loadBoardJobsFromCloud(); loadCalOrderFromCloud(); loadCalEventsFromCloud(); } catch(e){} }
+  window._wasOffline = offline;
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
 // Keep the token fresh when the app returns to the foreground, and periodically.
 document.addEventListener('visibilitychange', () => { if (!document.hidden) ensureFreshToken(); });
 setInterval(() => { ensureFreshToken(); }, 30*60*1000);
