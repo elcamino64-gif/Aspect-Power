@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: assign-crew-prompt -->
+<!-- build: fuel-zero-vehicles -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -503,7 +503,7 @@ body.viewer .viewer-hide{display:none !important}
     <div class="section">
       <div class="section-title">Fuel Surcharge</div>
       <label class="field-label">Number of Vehicles</label>
-      <select id="f-vehicles">
+      <select id="f-vehicles" onchange="updateTotal(); showMileage(document.getElementById('f-park').value)">
         <option value="0" selected>0 vehicles</option>
         <option value="1">1 vehicle</option><option value="2">2 vehicles</option>
         <option value="3">3 vehicles</option><option value="4">4 vehicles</option>
@@ -1348,7 +1348,8 @@ function calcTotal() {
   const assist = techAssist.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const lab = laborers.reduce((s,r) => s + (parseFloat(r.rate)||0)*(parseFloat(r.hours)||0), 0);
   const parkEl = document.getElementById('f-park');
-  const fuel = parkEl ? fuelCostFor(parkEl.value) : 0;
+  const vehEl = document.getElementById('f-vehicles');
+  const fuel = parkEl ? fuelCostFor(parkEl.value, vehEl ? vehEl.value : 0) : 0;
   return mat + test + tech + assist + lab + fuel;
 }
 
@@ -1456,7 +1457,12 @@ function lookupMileage(property){
   const loose = DEFAULT_MILEAGE_LOOSE[loosePark(property)];
   return (loose != null) ? loose : null;
 }
-function fuelCostFor(property){ const m = lookupMileage(property); return m != null ? m * FUEL_RATE : 0; }
+// Fuel surcharge for an order. No vehicles dispatched → no surcharge.
+function fuelCostFor(property, vehicles){
+  if (!(parseInt(vehicles, 10) > 0)) return 0;
+  const m = lookupMileage(property);
+  return m != null ? m * FUEL_RATE : 0;
+}
 // Grand total of an order, always including the fuel surcharge for its property,
 // so the figure stays consistent no matter when the order was saved.
 function orderTotal(o){
@@ -1465,7 +1471,7 @@ function orderTotal(o){
   const tech = (o.techLabor||[]).reduce((s,r)=>s+(parseFloat(r.rate)||0)*(parseFloat(r.hours)||0),0);
   const assist = (o.techAssist||[]).reduce((s,r)=>s+(parseFloat(r.rate)||0)*(parseFloat(r.hours)||0),0);
   const lab = (o.laborers||[]).reduce((s,r)=>s+(parseFloat(r.rate)||0)*(parseFloat(r.hours)||0),0);
-  return mat + test + tech + assist + lab + fuelCostFor(o.park);
+  return mat + test + tech + assist + lab + fuelCostFor(o.park, o.fuelVehicles);
 }
 
 function saveMileageDB() {
@@ -1491,8 +1497,12 @@ function showMileage(property) {
   if (!property) { refEl.innerHTML = ''; return; }
 
   const miles = lookupMileage(property);
+  const vehEl = document.getElementById('f-vehicles');
+  const vehicles = vehEl ? (parseInt(vehEl.value, 10) || 0) : 0;
   const editBtn = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#2e97f2;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px">edit</button>`;
-  if (miles != null) {
+  if (vehicles < 1) {
+    refEl.innerHTML = `⛽ No vehicles selected — no fuel surcharge` + (miles != null ? ` · round trip ${miles} mi ${editBtn}` : '');
+  } else if (miles != null) {
     refEl.innerHTML = `⛽ ${miles} mi round trip × $${FUEL_RATE.toFixed(2)} = $${(miles*FUEL_RATE).toFixed(2)} fuel ${editBtn}`;
   } else {
     refEl.innerHTML = `<button type="button" onclick="editMileage('${property.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#2e97f2;font-size:12px;text-decoration:underline;cursor:pointer;padding:0">+ Add round-trip mileage for this property</button>`;
@@ -2214,7 +2224,7 @@ function showDetail(id) {
     ${techLines?`<div class="detail-card"><div class="detail-card-title">Technical Labor</div>${techLines}</div>`:''}
     ${assistLines?`<div class="detail-card"><div class="detail-card-title">Technicians Assistant</div>${assistLines}</div>`:''}
     ${labLines?`<div class="detail-card"><div class="detail-card-title">Laborer</div>${labLines}</div>`:''}
-    ${(()=>{ const mi=lookupMileage(o.park); return `<div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${mi!=null?`${mi} mi round trip × $${FUEL_RATE.toFixed(2)}`:`${o.fuelVehicles||1} vehicle(s)`}</span><span class="detail-value"${mi!=null?'':' style="color:#86868b"'}>${mi!=null?`$${(mi*FUEL_RATE).toFixed(2)}`:'office calculates'}</span></div></div>`; })()}
+    ${(()=>{ const veh=parseInt(o.fuelVehicles||'0',10)||0; const mi=lookupMileage(o.park); const noVeh=veh<1; const label=noVeh?'No vehicles dispatched':(mi!=null?`${mi} mi round trip × $${FUEL_RATE.toFixed(2)}`:`${veh} vehicle(s)`); const val=noVeh?'$0.00':(mi!=null?`$${(mi*FUEL_RATE).toFixed(2)}`:'office calculates'); return `<div class="detail-card"><div class="detail-card-title">Fuel Surcharge</div><div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value"${(!noVeh&&mi==null)?' style="color:#86868b"':''}>${val}</span></div></div>`; })()}
     ${o.otherNotes?`<div class="detail-card"><div class="detail-card-title">Notes</div><div class="detail-card-text">${o.otherNotes}</div></div>`:''}
     <div class="total-box" style="margin-top:16px">
       <span class="total-label">Total</span>
@@ -2391,11 +2401,14 @@ function buildPlainEmail(o) {
   }
 
   b += `\n${'─'.repeat(40)}\nFUEL SURCHARGE\n\n`;
+  const fuelVeh = parseInt(o.fuelVehicles || '0', 10) || 0;
   const fuelMiles = lookupMileage(o.park);
-  if (fuelMiles != null) {
+  if (fuelVeh < 1) {
+    b += `No vehicles dispatched — no fuel surcharge  =  $0.00\n`;
+  } else if (fuelMiles != null) {
     b += `${fuelMiles} mi round trip × $${FUEL_RATE.toFixed(2)}/mi  =  $${(fuelMiles*FUEL_RATE).toFixed(2)}\n`;
   } else {
-    b += `${o.fuelVehicles||1} vehicle(s)   $0.95/mile — calculated by office\n`;
+    b += `${fuelVeh} vehicle(s)   $0.95/mile — calculated by office\n`;
   }
 
   if (o.otherNotes) {
@@ -2492,10 +2505,11 @@ function buildHtmlEmail(o) {
   const labSection = labRows.length ? card('Laborer', labContent) : '';
 
   // Fuel
+  const fuelVehHtml = parseInt(o.fuelVehicles||'0',10)||0;
   const fuelSection = card('Fuel Surcharge', `
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:#1d1d1f;font-size:14px;">${o.fuelVehicles||1} vehicle(s)</span>
-      <span style="color:#86868b;font-size:13px;">$0.95/mile \u2013 office calculates</span>
+      <span style="color:#1d1d1f;font-size:14px;">${fuelVehHtml < 1 ? 'No vehicles dispatched' : fuelVehHtml + ' vehicle(s)'}</span>
+      <span style="color:#86868b;font-size:13px;">${fuelVehHtml < 1 ? '$0.00' : '$0.95/mile \u2013 office calculates'}</span>
     </div>`);
 
   // Notes
@@ -2637,8 +2651,7 @@ LABORER
   body += `${line}
 FUEL SURCHARGE
 
-${o.fuelVehicles||1} vehicle(s) dispatched
-$0.95/mile — calculated by office
+${(parseInt(o.fuelVehicles||'0',10)||0) < 1 ? 'No vehicles dispatched — no fuel surcharge' : `${o.fuelVehicles} vehicle(s) dispatched\n$0.95/mile — calculated by office`}
 
 `;
 
