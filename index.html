@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: cal-crew-3wide -->
+<!-- build: assign-crew-prompt -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -728,6 +728,19 @@ body.viewer .viewer-hide{display:none !important}
     <div class="modal-btns">
       <button class="modal-btn-cancel" onclick="answerPermit(false)">No</button>
       <button class="modal-btn-confirm" onclick="answerPermit(true)">Yes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign-crew reminder, shown when a job moves into Scheduled -->
+<div class="modal-overlay" id="assign-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">Assign crew?</div>
+    <div style="font-size:13.5px;color:#86868b;line-height:1.5;margin-bottom:12px">This job is now <b>Scheduled</b>. Who's working it? Optional — you can change it anytime.</div>
+    <div id="assign-crew-pick"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="modal-btn-cancel" onclick="closeAssignPrompt()">Skip</button>
+      <button class="modal-btn-confirm" onclick="closeAssignPrompt()">Done</button>
     </div>
   </div>
 </div>
@@ -3952,6 +3965,31 @@ function toggleJobAssignee(id, name) {
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
+  if (assignPromptJobId === id) renderAssignPrompt(); // keep the reminder in sync
+}
+
+// Reminder to assign crew when a job moves into Scheduled. Not required — the
+// person can tap crew and hit Done, or Skip. Only shown when no one is assigned
+// yet, so it nudges without nagging.
+let assignPromptJobId = null;
+function maybePromptAssignCrew(id){
+  if (isViewer()) return;
+  const o = boardJobs.find(x => x.id === id);
+  if (!o || jobAssigned(o).length) return; // already has crew — no reminder needed
+  assignPromptJobId = id;
+  renderAssignPrompt();
+  document.getElementById('assign-overlay').style.display = 'flex';
+}
+function renderAssignPrompt(){
+  const o = boardJobs.find(x => x.id === assignPromptJobId);
+  const el = document.getElementById('assign-crew-pick');
+  if (!o || !el) return;
+  el.innerHTML = crewPickHtml(o);
+}
+function closeAssignPrompt(){
+  const ov = document.getElementById('assign-overlay');
+  if (ov) ov.style.display = 'none';
+  assignPromptJobId = null;
 }
 
 // Edit a single field on a board job (auto-saves).
@@ -3964,9 +4002,11 @@ function editBoardJobField(id, field, value) {
   if (field === 'contactTitle') addTitleOption(value);
   // Assigning a scheduled date automatically moves the job into the Scheduled
   // stage (from wherever it currently sits). Clearing the date leaves it be.
+  let justScheduled = false;
   if (field === 'scheduledDate' && value && normalizeStage(o.status) !== 'Scheduled') {
     o.status = 'Scheduled';
     seenStages[id] = 'Scheduled'; saveSeenStages(); // scheduler has "seen" this change
+    justScheduled = true;
   }
   persistBoardJob(o);
   // Remember this job's contact on the property directory automatically, so it
@@ -3979,6 +4019,7 @@ function editBoardJobField(id, field, value) {
   // A changed schedule date re-sorts its column (soonest first), so refresh the
   // board if it happens to be showing.
   if (field === 'scheduledDate') refreshBoardViews();
+  if (justScheduled) maybePromptAssignCrew(id);
 }
 // Multi-date scheduling control. Uses VISIBLE native date inputs, which open
 // the picker reliably on iPhone (an invisible/opacity:0 date input often won't).
@@ -4022,9 +4063,10 @@ function addJobScheduledDate(id, ds) {
   if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
+  const wasScheduled = normalizeStage(o.status) === 'Scheduled';
   setJobDates(o, [...jobDates(o), ds]);
   // Assigning a day moves the job into Scheduled (from wherever it is).
-  if (normalizeStage(o.status) !== 'Scheduled') {
+  if (!wasScheduled) {
     o.status = 'Scheduled';
     seenStages[id] = 'Scheduled'; saveSeenStages();
   }
@@ -4032,6 +4074,7 @@ function addJobScheduledDate(id, ds) {
   refreshBoardViews();
   renderBoardJob(id);
   toast('✓ Scheduled for ' + fmtDate(ds));
+  if (!wasScheduled) maybePromptAssignCrew(id);
 }
 function removeJobDate(id, ds) {
   if (isViewer()) return;
@@ -4091,6 +4134,7 @@ function moveBoardStage(id, stage) {
   seenStages[id] = normalizeStage(stage); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
   toast('✓ Moved to ' + normalizeStage(stage));
+  if (fromStage !== 'Scheduled' && normalizeStage(stage) === 'Scheduled') maybePromptAssignCrew(id);
 }
 function answerPermit(yes) {
   const id = permitJobId; permitJobId = null;
@@ -4101,6 +4145,7 @@ function answerPermit(yes) {
   persistBoardJob(o);
   seenStages[id] = normalizeStage(o.status); saveSeenStages(); // the mover has "seen" this change
   refreshBoardViews();
+  if (!yes) maybePromptAssignCrew(id);
 }
 function toggleChecklistItem(id, i) {
   const o = boardJobs.find(x => x.id === id);
