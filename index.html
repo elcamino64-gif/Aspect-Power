@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: polish-loading-offline -->
+<!-- build: polish-undo-labels-legend -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -314,11 +314,17 @@ body.viewer .viewer-hide{display:none !important}
 /* Confirmation toast */
 .toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translate(-50%,16px);background:#1d1d1f;color:#fff;font-size:14px;font-weight:600;padding:12px 20px;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.28);z-index:300;opacity:0;pointer-events:none;transition:opacity 0.22s,transform 0.22s;max-width:86%;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.has-undo{display:flex;align-items:center;gap:14px;pointer-events:auto}
+.toast-undo{background:transparent;border:none;color:#5ac8fa;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;padding:2px 2px;white-space:nowrap}
 /* Calendar */
 .cal-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid #e5e5ea}
 .cal-title{flex:1;text-align:center;font-size:17px;font-weight:800;color:#1d1d1f}
 .cal-nav{width:34px;height:34px;border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:18px;font-weight:700;border-radius:9px;cursor:pointer;font-family:inherit;line-height:1;flex-shrink:0}
 .cal-today{border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:13px;font-weight:600;padding:8px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0}
+.cal-legend{display:flex;gap:12px;overflow-x:auto;padding:8px 14px;background:#fff;border-bottom:1px solid #e5e5ea;-webkit-overflow-scrolling:touch}
+.cal-legend::-webkit-scrollbar{display:none}
+.cal-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#3a3a3c;white-space:nowrap;flex:none}
+.cal-legend-dot{width:10px;height:10px;border-radius:50%;flex:none}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
 .cal-wd{text-align:center;font-size:10.5px;font-weight:700;color:#86868b;padding:7px 0;text-transform:uppercase;letter-spacing:0.3px}
 .cal-head{border-bottom:1px solid #e5e5ea;background:#fafafa}
@@ -605,6 +611,7 @@ body.viewer .viewer-hide{display:none !important}
     <span class="cal-title" id="cal-title">Calendar</span>
     <button class="cal-today" onclick="calToday()">Today</button>
   </div>
+  <div class="cal-legend" id="cal-legend"></div>
   <div class="scroll" id="cal-content"></div>
 </div>
 
@@ -652,7 +659,7 @@ body.viewer .viewer-hide{display:none !important}
       <label class="fl">Stage</label>
       <select id="nj-stage"></select>
 
-      <label class="fl">Scheduled For</label>
+      <label class="fl">Scheduled</label>
       <input type="date" id="nj-sched" class="form-dateinput"/>
 
       <label class="fl">Assigned Crew</label>
@@ -665,31 +672,31 @@ body.viewer .viewer-hide{display:none !important}
       </div>
       <div id="nj-address-hint" style="font-size:12px;color:#86868b;margin-top:6px"></div>
 
-      <label class="fl">Space / Location</label>
-      <input type="text" id="nj-space" placeholder="Space #, address, or panel"/>
+      <label class="fl">Job Location</label>
+      <input type="text" id="nj-space" placeholder="Space #, unit, or panel"/>
 
-      <label class="fl">Description of Work</label>
+      <label class="fl">Description</label>
       <textarea id="nj-desc" rows="3" placeholder="Describe the scope..."></textarea>
 
-      <label class="fl">Status Tag (optional)</label>
+      <label class="fl">Status Tag</label>
       <input type="text" id="nj-tag" placeholder="e.g. PG&amp;E hold, Proposal sent"/>
 
       <label class="fl">Contact</label>
       <select id="nj-contact-select" onchange="njPickContact()"><option value="new">+ New contact</option></select>
 
-      <label class="fl">Contact Name (optional)</label>
+      <label class="fl">Contact Name</label>
       <input type="text" id="nj-contact" placeholder="Name"/>
 
-      <label class="fl">Title (optional)</label>
+      <label class="fl">Title</label>
       <input type="text" id="nj-contact-title" list="title-options" placeholder="e.g. Manager"/>
 
-      <label class="fl">Contact Phone (optional)</label>
+      <label class="fl">Contact Phone</label>
       <input type="tel" id="nj-contact-phone" inputmode="tel" placeholder="Phone number"/>
 
-      <label class="fl">Contact Email (optional)</label>
+      <label class="fl">Contact Email</label>
       <input type="email" id="nj-contact-email" inputmode="email" placeholder="Email"/>
 
-      <label class="fl">Attachments (optional)</label>
+      <label class="fl">Attachments</label>
       <div id="nj-attachments"></div>
     </div>
     <div class="sheet-foot"><button class="save-job" onclick="saveNewJob()">Save Job</button></div>
@@ -2838,13 +2845,32 @@ function escHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'
 
 // Brief confirmation message at the bottom of the screen.
 let toastTimer = null;
+function hideToast(){ const t = document.getElementById('toast'); if (t) t.classList.remove('show'); }
 function toast(msg) {
   const t = document.getElementById('toast');
   if (!t) return;
+  t.classList.remove('has-undo');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1900);
+  toastTimer = setTimeout(hideToast, 1900);
+}
+// A toast with an Undo button, shown longer so there's time to tap it.
+function toastUndo(msg, undoFn) {
+  const t = document.getElementById('toast');
+  if (!t) { if (typeof undoFn === 'function') {/* no UI: leave as-is */} return; }
+  t.classList.add('has-undo');
+  t.innerHTML = '<span class="toast-msg"></span><button type="button" class="toast-undo">Undo</button>';
+  t.querySelector('.toast-msg').textContent = msg;
+  t.querySelector('.toast-undo').onclick = () => {
+    clearTimeout(toastTimer);
+    hideToast();
+    t.classList.remove('has-undo');
+    try { undoFn(); } catch(e) { console.error('undo failed:', e); }
+  };
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { hideToast(); t.classList.remove('has-undo'); }, 6000);
 }
 
 function avatarFor(name) {
@@ -3126,9 +3152,16 @@ function constructionHolidays(year) {
   return map;
 }
 
+function renderCalLegend() {
+  const el = document.getElementById('cal-legend');
+  if (!el) return;
+  el.innerHTML = STAGES.map(s => `<span class="cal-legend-item"><span class="cal-legend-dot" style="background:${s.color}"></span>${escHtml(s.name)}</span>`).join('')
+    + `<span class="cal-legend-item"><span class="cal-legend-dot" style="background:#475569"></span>Event / day off</span>`;
+}
 function showCalendar() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-calendar').classList.add('active');
+  renderCalLegend();
   renderCalendar();
   scrollCalToCurrent();
   if (!calScrollBound) {
@@ -3225,13 +3258,22 @@ function calSaveEventFromForm(id) {
 }
 function calDeleteEvent(id) {
   if (isViewer()) return;
-  if (!confirm('Delete this event?')) return;
-  const ev = calEvents.find(e => String(e.id) === String(id));
-  calEvents = calEvents.filter(e => String(e.id) !== String(id));
+  const idx = calEvents.findIndex(e => String(e.id) === String(id));
+  if (idx < 0) return;
+  const ev = calEvents[idx];
+  calEvents.splice(idx, 1);
   saveCalEventsLocal();
-  if (ev) deleteCalEventFromCloud(ev.id);
+  deleteCalEventFromCloud(ev.id);
   calRenderDaySheet();
   renderCalendar();
+  toastUndo('Event deleted', () => {
+    calEvents.splice(Math.min(idx, calEvents.length), 0, ev);
+    saveCalEventsLocal();
+    saveCalEventToCloud(ev);
+    calRenderDaySheet();
+    renderCalendar();
+    toast('✓ Event restored');
+  });
 }
 
 function calJobsOn(ds) {
@@ -3846,7 +3888,7 @@ function renderBoardJob(id) {
   if (boardJobEditMode) {
     const stageOpts = STAGES.map(s => `<option value="${s.name}"${normalizeStage(o.status)===s.name?' selected':''}>${s.name}</option>`).join('');
     top = `
-      <label class="fl">Scheduled Dates</label>
+      <label class="fl">Scheduled</label>
       ${jobDatesControl(o)}
       <label class="fl">Stage</label>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
@@ -3996,11 +4038,18 @@ function removeJobDate(id, ds) {
   if (isViewer()) return;
   const o = boardJobs.find(x => x.id === id);
   if (!o) return;
-  setJobDates(o, jobDates(o).filter(d => d !== ds));
+  const prev = jobDates(o).slice();
+  setJobDates(o, prev.filter(d => d !== ds));
   persistBoardJob(o);
   refreshBoardViews();
   renderBoardJob(id);
-  toast('Date removed');
+  toastUndo('Date removed', () => {
+    setJobDates(o, prev);
+    persistBoardJob(o);
+    refreshBoardViews();
+    renderBoardJob(id);
+    toast('✓ Date restored');
+  });
 }
 // Edit the property's address from a job — saved to the property directory
 // (shared by every job at that property).
@@ -4090,13 +4139,23 @@ function removeChecklistItem(id, i) {
 }
 function removeBoardJob(id) {
   if (isViewer()) return;
-  if (!confirm('Remove this job from the board?')) return;
-  boardJobs = boardJobs.filter(o => o.id !== id);
+  const idx = boardJobs.findIndex(o => o.id === id);
+  if (idx < 0) return;
+  const removed = boardJobs[idx];
+  boardJobs.splice(idx, 1);
   saveBoardJobsLocal();
   deleteBoardJobFromCloud(id);
   expandedBoardId = null;
   currentBoardJobId = null;
   showBoard();
+  // No scary confirm box — remove right away, with a few seconds to undo.
+  toastUndo('Job removed', () => {
+    boardJobs.splice(Math.min(idx, boardJobs.length), 0, removed);
+    saveBoardJobsLocal();
+    saveBoardJobToCloud(removed);
+    showBoard();
+    toast('✓ Job restored');
+  });
 }
 
 // ── New Job bottom sheet ──────────────────────────────────
