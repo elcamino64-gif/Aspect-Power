@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: polish-undo-labels-legend -->
+<!-- build: crew-on-schedule-no-newtag -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -321,10 +321,6 @@ body.viewer .viewer-hide{display:none !important}
 .cal-title{flex:1;text-align:center;font-size:17px;font-weight:800;color:#1d1d1f}
 .cal-nav{width:34px;height:34px;border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:18px;font-weight:700;border-radius:9px;cursor:pointer;font-family:inherit;line-height:1;flex-shrink:0}
 .cal-today{border:1px solid #d2d2d7;background:#fff;color:#2e97f2;font-size:13px;font-weight:600;padding:8px 12px;border-radius:9px;cursor:pointer;font-family:inherit;flex-shrink:0}
-.cal-legend{display:flex;gap:12px;overflow-x:auto;padding:8px 14px;background:#fff;border-bottom:1px solid #e5e5ea;-webkit-overflow-scrolling:touch}
-.cal-legend::-webkit-scrollbar{display:none}
-.cal-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#3a3a3c;white-space:nowrap;flex:none}
-.cal-legend-dot{width:10px;height:10px;border-radius:50%;flex:none}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
 .cal-wd{text-align:center;font-size:10.5px;font-weight:700;color:#86868b;padding:7px 0;text-transform:uppercase;letter-spacing:0.3px}
 .cal-head{border-bottom:1px solid #e5e5ea;background:#fafafa}
@@ -334,7 +330,10 @@ body.viewer .viewer-hide{display:none !important}
 .cal-dnum{font-size:12px;font-weight:600;color:#3a3a3c;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0}
 .cal-day.today .cal-dnum{background:#2e97f2;color:#fff}
 .cal-day.sel{outline:2px solid #2e97f2;outline-offset:-2px}
-.cal-chip{font-size:10px;font-weight:600;color:#fff;background:var(--c,#888);border-radius:4px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;line-height:1.35}
+.cal-chip{display:flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:#fff;background:var(--c,#888);border-radius:4px;padding:2px 5px;cursor:pointer;line-height:1.35;overflow:hidden}
+.cal-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.cal-chip-crew{display:inline-flex;gap:1px;flex:none}
+.cal-crew-dot{width:13px;height:13px;border-radius:50%;color:#fff;font-size:8px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 1px rgba(255,255,255,0.55)}
 .cal-more{font-size:9px;color:#86868b;font-weight:600;padding-left:2px}
 .cal-hol{font-size:9px;font-weight:700;color:#e5484d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
 .cal-daylist{padding:14px 16px 40px}
@@ -611,7 +610,6 @@ body.viewer .viewer-hide{display:none !important}
     <span class="cal-title" id="cal-title">Calendar</span>
     <button class="cal-today" onclick="calToday()">Today</button>
   </div>
-  <div class="cal-legend" id="cal-legend"></div>
   <div class="scroll" id="cal-content"></div>
 </div>
 
@@ -661,9 +659,6 @@ body.viewer .viewer-hide{display:none !important}
 
       <label class="fl">Scheduled</label>
       <input type="date" id="nj-sched" class="form-dateinput"/>
-
-      <label class="fl">Assigned Crew</label>
-      <div id="nj-assigned"></div>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -766,6 +761,18 @@ function crewAvatars(list){
   const l = (list || []).filter(n => CREW.includes(n));
   if (!l.length) return '';
   return `<div class="crew-avatars">${l.map(n => `<span class="crew-av" style="background:${crewColor(n)}" title="${escHtml(n)}">${crewInitials(n)}</span>`).join('')}</div>`;
+}
+// Tap-to-toggle crew chips for a job (used when scheduling, in the job view).
+function crewPickHtml(o){
+  return `<div class="crew-pick">${CREW.map(name =>
+    `<button type="button" class="crew-chip${jobAssigned(o).includes(name)?' on':''}" style="--cc:${crewColor(name)}" onclick="toggleJobAssignee(${o.id},'${name}')">${escHtml(name)}</button>`
+  ).join('')}</div>`;
+}
+// Tiny crew initials for calendar chips (small colored dots with an initial).
+function crewMini(list){
+  const l = (list || []).filter(n => CREW.includes(n));
+  if (!l.length) return '';
+  return `<span class="cal-chip-crew">${l.map(n => `<span class="cal-crew-dot" style="background:${crewColor(n)}" title="${escHtml(n)}">${crewInitials(n)}</span>`).join('')}</span>`;
 }
 
 // ── Access level ──────────────────────────────────────────────────────────
@@ -3152,16 +3159,9 @@ function constructionHolidays(year) {
   return map;
 }
 
-function renderCalLegend() {
-  const el = document.getElementById('cal-legend');
-  if (!el) return;
-  el.innerHTML = STAGES.map(s => `<span class="cal-legend-item"><span class="cal-legend-dot" style="background:${s.color}"></span>${escHtml(s.name)}</span>`).join('')
-    + `<span class="cal-legend-item"><span class="cal-legend-dot" style="background:#475569"></span>Event / day off</span>`;
-}
 function showCalendar() {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-calendar').classList.add('active');
-  renderCalLegend();
   renderCalendar();
   scrollCalToCurrent();
   if (!calScrollBound) {
@@ -3308,7 +3308,7 @@ function calMonthBlock(y, m, todayStr) {
     // Events (personal items) first, then jobs — capped at 3 chips per day.
     const chipEls = [];
     evs.forEach(e => chipEls.push(`<div class="cal-chip cal-ev" title="${escHtml(e.title||'')}" onclick="event.stopPropagation();openCalDay('${ds}')">📌 ${escHtml(e.title||'Event')}</div>`));
-    jobs.forEach(o => chipEls.push(`<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')">${escHtml(o.park||'—')}</div>`));
+    jobs.forEach(o => chipEls.push(`<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')"><span class="cal-chip-name">${escHtml(o.park||'—')}</span>${crewMini(o.assigned)}</div>`));
     const chips = chipEls.slice(0, 3).join('');
     const more = chipEls.length > 3 ? `<div class="cal-more">+${chipEls.length-3} more</div>` : '';
     cells += `<div class="${cls}" onclick="openCalDay('${ds}')"><div class="cal-dnum">${d}</div>${holHtml}${chips}${more}</div>`;
@@ -3353,7 +3353,6 @@ function boardCardHtml(o) {
   return `<div class="board-card${expandedBoardId===o.id?' open':''}" style="--edge:${col}" data-id="${o.id}" onclick="boardCardClick(event,${o.id})">
     <div class="board-card-top">
       <span class="board-card-park">${escHtml(o.park || '—')}</span>
-      ${isJobNew(o)?'<span class="board-new-pill" title="New — just added or its status changed since you last opened it">NEW</span>':''}
     </div>
     ${o.spaceLocation?`<div class="board-card-space">${escHtml(o.spaceLocation)}</div>`:''}
     ${o.description?`<div class="board-card-scope">${escHtml(o.description)}</div>`:''}
@@ -3893,7 +3892,7 @@ function renderBoardJob(id) {
       <label class="fl">Stage</label>
       <select class="move-sel" style="width:100%" onchange="moveBoardStage(${o.id}, this.value)">${stageOpts}</select>
       <label class="fl">Assigned Crew</label>
-      <div class="crew-pick">${CREW.map(name => `<button type="button" class="crew-chip${jobAssigned(o).includes(name)?' on':''}" style="--cc:${crewColor(name)}" onclick="toggleJobAssignee(${o.id},'${name}')">${escHtml(name)}</button>`).join('')}</div>
+      ${crewPickHtml(o)}
       <label class="fl">Job Location</label>
       <input type="text" value="${escHtml(o.spaceLocation||'')}" placeholder="Space #, unit, or panel" onchange="editBoardJobField(${o.id},'spaceLocation',this.value)"/>
       <label class="fl">Description</label>
@@ -3919,7 +3918,7 @@ function renderBoardJob(id) {
       <div class="bj-group">
         <div class="bj-row"><div class="l">Scheduled</div><div class="v">${schedControl}</div></div>
         <div class="bj-row"><div class="l">Stage</div><div class="v">${stageControl}</div></div>
-        <div class="bj-row"><div class="l">Assigned</div><div class="v${asg.length?' crew-names':' muted'}">${asg.length?asg.map(escHtml).join(', '):'—'}</div></div>`;
+        <div class="bj-row"><div class="l">Assigned</div><div class="v">${isViewer() ? (asg.length?`<span class="crew-names">${asg.map(escHtml).join(', ')}</span>`:'<span class="muted">—</span>') : crewPickHtml(o)}</div></div>`;
     top += `
         ${row('Job Location', escHtml(o.spaceLocation||'—'), !o.spaceLocation)}
         ${o.description ? `<div class="bj-row"><div class="l">Description</div><div class="v" style="white-space:pre-wrap">${escHtml(o.description)}</div></div>` : ''}
@@ -4160,18 +4159,7 @@ function removeBoardJob(id) {
 
 // ── New Job bottom sheet ──────────────────────────────────
 let njType = 'project';
-let njAssigned = [];
-function njRenderAssigned(){
-  const el = document.getElementById('nj-assigned');
-  if (!el) return;
-  el.innerHTML = `<div class="crew-pick">${CREW.map(name =>
-    `<button type="button" class="crew-chip${njAssigned.includes(name)?' on':''}" style="--cc:${crewColor(name)}" onclick="njToggleAssignee('${name}')">${escHtml(name)}</button>`
-  ).join('')}</div>`;
-}
-function njToggleAssignee(name){
-  njAssigned = njAssigned.includes(name) ? njAssigned.filter(n => n !== name) : [...njAssigned, name];
-  njRenderAssigned();
-}
+// Crew is assigned when scheduling a job (in the job view), not at creation.
 function njSetType(t) {
   njType = t || 'project';
   const njStage = document.getElementById('nj-stage');
@@ -4187,8 +4175,6 @@ function openNewJob() {
   njPropChange(); // resets the contact dropdown + address hint for the (empty) property
   njAttachments = [];
   njRenderAttachments();
-  njAssigned = [];
-  njRenderAssigned();
   document.getElementById('nj-overlay').classList.add('show');
 }
 
@@ -4435,7 +4421,7 @@ function saveNewJob() {
   // A new job created with a scheduled date starts in the Scheduled stage.
   const stage = njSchedVal ? 'Scheduled' : (document.getElementById('nj-stage').value || 'Inquiries');
   const job = {
-    id: Date.now(), date: dateStr, by, park, assigned: njAssigned.slice(),
+    id: Date.now(), date: dateStr, by, park, assigned: [],
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
     status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
@@ -4456,7 +4442,6 @@ function saveNewJob() {
     upsertPropertyContact(park, { name: job.contact, title: job.contactTitle, phone: job.contactPhone, email: job.contactEmail });
   }
   njAttachments = [];
-  njAssigned = [];
   expandedBoardId = job.id;
   closeNewJob();
   showBoard();
