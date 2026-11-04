@@ -162,6 +162,8 @@ create table if not exists calendar_events (
   note       text,
   created_at timestamptz default now()
 );
+-- Crew assigned to an event (list of first names). Safe to run repeatedly.
+alter table calendar_events add column if not exists assigned jsonb default '[]'::jsonb;
 alter table calendar_events enable row level security;
 drop policy if exists calendar_events_all on calendar_events;
 drop policy if exists calendar_events_authed on calendar_events;
