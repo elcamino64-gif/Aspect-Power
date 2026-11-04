@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fuel-zero-vehicles -->
+<!-- build: event-crew-unified-order -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3045,12 +3045,32 @@ function markCalEventSynced(id){ calEventsSynced[String(id)] = 1; try { localSto
 function unmarkCalEventSynced(id){ delete calEventsSynced[String(id)]; try { localStorage.setItem('calEventsSynced', JSON.stringify(calEventsSynced)); } catch(e){} }
 function calEventsOn(ds){ return calEvents.filter(e => (e.date||'') === ds).sort((a,b)=>(a.title||'').localeCompare(b.title||'')); }
 
-// ── Calendar job order (manual per-day ordering of jobs) ──────────────────
-// calOrder maps 'YYYY-MM-DD' → [jobId, jobId, …] — the order jobs run that day.
-// Jobs not listed fall to the bottom (by park name). Synced via calendar_order.
+// ── Calendar day order (manual per-day ordering of events AND jobs) ───────
+// calOrder maps 'YYYY-MM-DD' → ['e123','j456', …] — the order items run that
+// day. Keys are 'e'+id for events, 'j'+id for jobs. Items not listed fall to
+// the bottom (events first by title, then jobs by park). Synced via
+// calendar_order. (Legacy rows stored bare job-id numbers; those are read as
+// jobs for backward compatibility.)
 let calOrder = {};
 try { calOrder = JSON.parse(localStorage.getItem('calOrder') || '{}'); } catch(e){ calOrder = {}; }
 function saveCalOrderLocal(){ try { localStorage.setItem('calOrder', JSON.stringify(calOrder)); } catch(e){} }
+function calItemKey(type, id){ return (type === 'event' ? 'e' : 'j') + id; }
+// Legacy order entries were bare numeric job ids — treat a number as a job key.
+function normalizeOrderKey(k){ return (typeof k === 'number') ? ('j' + k) : String(k); }
+// Every item (event + job) on a day, in the saved manual order. Items not yet
+// placed fall to the bottom: events first (by title), then jobs (by park).
+function calDayItems(ds){
+  const items = calEventsOn(ds).map(e => ({ type:'event', id:e.id, data:e }))
+    .concat(boardJobs.filter(o => jobDates(o).includes(ds)).map(o => ({ type:'job', id:o.id, data:o })));
+  const order = (calOrder[ds] || []).map(normalizeOrderKey);
+  const byKey = {}; items.forEach(it => { byKey[calItemKey(it.type, it.id)] = it; });
+  const result = [];
+  order.forEach(k => { if (byKey[k]) { result.push(byKey[k]); delete byKey[k]; } });
+  const rest = Object.keys(byKey).map(k => byKey[k]);
+  const restEv = rest.filter(x => x.type === 'event').sort((a,b)=>(a.data.title||'').localeCompare(b.data.title||''));
+  const restJob = rest.filter(x => x.type === 'job').sort((a,b)=>(a.data.park||'').localeCompare(b.data.park||''));
+  return result.concat(restEv, restJob);
+}
 async function saveCalOrderToCloud(ds, ids){
   try {
     await fetch(SUPABASE_URL + '/rest/v1/calendar_order', {
@@ -3066,24 +3086,24 @@ async function loadCalOrderFromCloud(){
     const rows = await sbFetch('calendar_order');
     if (rows && rows.length !== undefined) {
       const m = {};
-      rows.forEach(r => { if (r && r.date) m[r.date] = Array.isArray(r.job_ids) ? r.job_ids.map(Number) : []; });
+      rows.forEach(r => { if (r && r.date) m[r.date] = Array.isArray(r.job_ids) ? r.job_ids.map(normalizeOrderKey) : []; });
       calOrder = m;
       saveCalOrderLocal();
       if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
     }
   } catch(e){ console.error('loadCalOrderFromCloud failed (using local order):', e); }
 }
-// Move a job up/down in a day's running order (dir = -1 up, +1 down).
-function calMoveJob(ds, id, dir){
+// Move an item (event or job) up/down in a day's running order (dir = -1 up, +1 down).
+function calMoveItem(ds, key, dir){
   if (isViewer()) return;
-  const ids = calJobsOn(ds).map(o => o.id);
-  const i = ids.indexOf(id);
+  const keys = calDayItems(ds).map(it => calItemKey(it.type, it.id));
+  const i = keys.indexOf(key);
   const j = i + dir;
-  if (i < 0 || j < 0 || j >= ids.length) return;
-  ids.splice(j, 0, ids.splice(i, 1)[0]);
-  calOrder[ds] = ids;
+  if (i < 0 || j < 0 || j >= keys.length) return;
+  keys.splice(j, 0, keys.splice(i, 1)[0]);
+  calOrder[ds] = keys;
   saveCalOrderLocal();
-  saveCalOrderToCloud(ds, ids);
+  saveCalOrderToCloud(ds, keys);
   calRenderDaySheet();
   renderCalendar();
 }
@@ -3094,7 +3114,7 @@ async function loadCalEventsFromCloud(){
   // Only merge when the cloud actually answered. If the table is missing or we
   // are offline (rows === null), keep whatever is stored locally — never wipe it.
   if (rows && rows.length !== undefined) {
-    const cloud = rows.map(r => ({ id:r.id, date:r.date||'', title:r.title||'', note:r.note||'' }));
+    const cloud = rows.map(r => ({ id:r.id, date:r.date||'', title:r.title||'', note:r.note||'', assigned: Array.isArray(r.assigned) ? r.assigned.filter(n => CREW.includes(n)) : [] }));
     const cloudIds = new Set(cloud.map(e => String(e.id)));
     // Keep local events the cloud doesn't have ONLY if they were never synced
     // (a synced-but-absent event was deleted elsewhere, so let it go).
@@ -3107,13 +3127,17 @@ async function loadCalEventsFromCloud(){
   if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
 }
 async function saveCalEventToCloud(ev){
+  const post = (payload) => fetch(SUPABASE_URL + '/rest/v1/calendar_events', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + bearer(),
+      'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(payload)
+  });
   try {
-    const res = await fetch(SUPABASE_URL + '/rest/v1/calendar_events', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + bearer(),
-        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ id: ev.id, date: ev.date, title: ev.title, note: ev.note })
-    });
+    // Try with the crew list; if the column doesn't exist yet, retry without it.
+    const full = { id: ev.id, date: ev.date, title: ev.title, note: ev.note, assigned: ev.assigned || [] };
+    let res = await post(full);
+    if (!res.ok) { const noA = { ...full }; delete noA.assigned; res = await post(noA); }
     if (res.ok) markCalEventSynced(ev.id);
     else console.warn('saveCalEventToCloud failed (saved locally):', res.status, await res.text());
   } catch(e) { console.error('saveCalEventToCloud network error (saved locally):', e); }
@@ -3225,45 +3249,66 @@ function calRenderDaySheet() {
   const dt = new Date(Y, Mo-1, D);
   document.getElementById('cal-day-title').textContent = `${CAL_WD_FULL[dt.getDay()]}, ${CAL_MONTHS[Mo-1]} ${D}`;
   const hol = constructionHolidays(Y)[ds];
-  const evs = calEventsOn(ds);
-  const jobs = calJobsOn(ds);
+  const items = calDayItems(ds);
   let b = (hol ? `<div class="cal-daylist-hol">🏗️ ${escHtml(hol)} — typical day off</div>` : '');
-  b += evs.map(e =>
-    `<div class="cal-ev-li">
-       <div class="cal-ev-li-main" onclick="calShowEventForm('${e.id}')"><div class="cal-ev-li-title">📌 ${escHtml(e.title||'Event')}</div>${e.note?`<div class="cal-li-sub">${escHtml(e.note)}</div>`:''}</div>
-       <button class="cal-ev-del viewer-hide" onclick="calDeleteEvent('${e.id}')">✕</button>
-     </div>`).join('');
-  const canReorder = !isViewer() && jobs.length > 1;
-  if (canReorder) b += `<div class="cal-reorder-hint">▲▼ sets the order jobs run this day (first at top)</div>`;
-  b += jobs.map((o, idx) => {
-      const move = canReorder
-        ? `<div class="cal-li-move">
-             <button class="cal-mv" ${idx===0?'disabled':''} onclick="event.stopPropagation();calMoveJob('${ds}',${o.id},-1)">▲</button>
-             <button class="cal-mv" ${idx===jobs.length-1?'disabled':''} onclick="event.stopPropagation();calMoveJob('${ds}',${o.id},1)">▼</button>
-           </div>`
-        : '';
-      return `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
+  const canReorder = !isViewer() && items.length > 1;
+  if (canReorder) b += `<div class="cal-reorder-hint">▲▼ sets the order for the day (first at top)</div>`;
+  items.forEach((it, idx) => {
+    const key = calItemKey(it.type, it.id);
+    const move = canReorder
+      ? `<div class="cal-li-move">
+           <button class="cal-mv" ${idx===0?'disabled':''} onclick="event.stopPropagation();calMoveItem('${ds}','${key}',-1)">▲</button>
+           <button class="cal-mv" ${idx===items.length-1?'disabled':''} onclick="event.stopPropagation();calMoveItem('${ds}','${key}',1)">▼</button>
+         </div>`
+      : '';
+    if (it.type === 'event') {
+      const e = it.data;
+      b += `<div class="cal-ev-li">
+        ${move}
+        <div class="cal-ev-li-main" onclick="calShowEventForm('${e.id}')"><div class="cal-ev-li-title">📌 ${escHtml(e.title||'Event')}</div>${e.note?`<div class="cal-li-sub">${escHtml(e.note)}</div>`:''}${crewAvatars(e.assigned)}</div>
+        <button class="cal-ev-del viewer-hide" onclick="event.stopPropagation();calDeleteEvent('${e.id}')">✕</button>
+      </div>`;
+    } else {
+      const o = it.data;
+      b += `<div class="cal-li" style="--c:${stageColor(o.status)}" onclick="closeCalDay();showBoardJob(${o.id},'calendar')">
         ${move}
         <div class="cal-li-main"><div class="cal-li-title">${escHtml(o.park||'—')}</div>${o.spaceLocation?`<div class="cal-li-sub">${escHtml(o.spaceLocation)}</div>`:''}${o.description?`<div class="cal-li-sub">${escHtml(o.description)}</div>`:''}${crewAvatars(o.assigned)}</div>
         <div class="cal-li-stage" style="color:${stageColor(o.status)}">${escHtml(normalizeStage(o.status))}</div>
       </div>`;
-    }).join('');
-  if (!evs.length && !jobs.length && !hol) b += '<div class="cal-empty">Nothing on this day yet.</div>';
+    }
+  });
+  if (!items.length && !hol) b += '<div class="cal-empty">Nothing on this day yet.</div>';
   if (!isViewer()) b += `<button class="cal-add-ev" onclick="calShowEventForm(null)">＋ Add event</button>`;
   document.getElementById('cal-day-body').innerHTML = b;
+}
+let calFormAssigned = [];
+function calRenderFormCrew(){
+  const el = document.getElementById('cal-ev-crew');
+  if (!el) return;
+  el.innerHTML = `<div class="crew-pick">${CREW.map(name =>
+    `<button type="button" class="crew-chip${calFormAssigned.includes(name)?' on':''}" style="--cc:${crewColor(name)}" onclick="calToggleFormCrew('${name}')">${escHtml(name)}</button>`
+  ).join('')}</div>`;
+}
+function calToggleFormCrew(name){
+  calFormAssigned = calFormAssigned.includes(name) ? calFormAssigned.filter(n => n !== name) : [...calFormAssigned, name];
+  calRenderFormCrew();
 }
 function calShowEventForm(id) {
   if (isViewer()) return;
   const ev = id ? calEvents.find(e => String(e.id) === String(id)) : null;
+  calFormAssigned = (ev && Array.isArray(ev.assigned)) ? ev.assigned.filter(n => CREW.includes(n)) : [];
   document.getElementById('cal-day-body').innerHTML = `
     <div class="cal-ev-form">
       <label class="fl">Title</label>
       <input id="cal-ev-title" type="text" placeholder="e.g. Troy's birthday (not working)" value="${ev?escHtml(ev.title):''}"/>
       <label class="fl">Note (optional)</label>
       <textarea id="cal-ev-note" rows="2" placeholder="Any details...">${ev?escHtml(ev.note||''):''}</textarea>
+      <label class="fl">Assigned Crew</label>
+      <div id="cal-ev-crew"></div>
       <button class="cal-ev-save" onclick="calSaveEventFromForm(${ev?`'${ev.id}'`:'null'})">${ev?'Save changes':'Add to calendar'}</button>
       <button class="cal-ev-cancel" onclick="calRenderDaySheet()">Cancel</button>
     </div>`;
+  calRenderFormCrew();
   const t = document.getElementById('cal-ev-title'); if (t) t.focus();
 }
 function calSaveEventFromForm(id) {
@@ -3273,9 +3318,9 @@ function calSaveEventFromForm(id) {
   if (!title) { alert('Please enter a title for the event.'); return; }
   if (id) {
     const ev = calEvents.find(e => String(e.id) === String(id));
-    if (ev) { ev.title = title; ev.note = note; saveCalEventsLocal(); saveCalEventToCloud(ev); }
+    if (ev) { ev.title = title; ev.note = note; ev.assigned = calFormAssigned.slice(); saveCalEventsLocal(); saveCalEventToCloud(ev); }
   } else {
-    const ev = { id: Date.now(), date: calDaySheetDate, title, note };
+    const ev = { id: Date.now(), date: calDaySheetDate, title, note, assigned: calFormAssigned.slice() };
     calEvents.push(ev); saveCalEventsLocal(); saveCalEventToCloud(ev);
   }
   calRenderDaySheet();
@@ -3303,18 +3348,8 @@ function calDeleteEvent(id) {
 }
 
 function calJobsOn(ds) {
-  // The calendar shows ALL scheduled jobs, including completed ones, so past
-  // work stays on the calendar for review (completed jobs render green).
-  // Jobs follow the manual order set for this day (calOrder); any not placed
-  // yet fall to the bottom, ordered by park name.
-  const order = calOrder[ds] || [];
-  const pos = id => { const i = order.indexOf(id); return i === -1 ? 1e9 : i; };
-  return boardJobs.filter(o => jobDates(o).includes(ds))
-    .sort((a,b) => {
-      const pa = pos(a.id), pb = pos(b.id);
-      if (pa !== pb) return pa - pb;
-      return (a.park||'').localeCompare(b.park||'');
-    });
+  // Jobs on a day, in the unified manual order (events + jobs share one order).
+  return calDayItems(ds).filter(it => it.type === 'job').map(it => it.data);
 }
 
 function calMonthBlock(y, m, todayStr) {
@@ -3326,15 +3361,19 @@ function calMonthBlock(y, m, todayStr) {
   for (let i = 0; i < startPad; i++) cells += '<div class="cal-day empty"></div>';
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const jobs = calJobsOn(ds);
-    const evs = calEventsOn(ds);
+    const items = calDayItems(ds);
     const hol = holidays[ds];
     const cls = 'cal-day' + (ds === todayStr ? ' today' : '') + (hol ? ' holiday' : '');
     const holHtml = hol ? `<div class="cal-hol" title="${escHtml(hol)}">🏗️ ${escHtml(hol)}</div>` : '';
-    // Events (personal items) first, then jobs — capped at 3 chips per day.
-    const chipEls = [];
-    evs.forEach(e => chipEls.push(`<div class="cal-chip cal-ev" title="${escHtml(e.title||'')}" onclick="event.stopPropagation();openCalDay('${ds}')">📌 ${escHtml(e.title||'Event')}</div>`));
-    jobs.forEach(o => chipEls.push(`<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')"><span class="cal-chip-name">${escHtml(o.park||'—')}</span>${crewMini(o.assigned)}</div>`));
+    // Events and jobs in the day's manual order — capped at 3 chips per day.
+    const chipEls = items.map(it => {
+      if (it.type === 'event') {
+        const e = it.data;
+        return `<div class="cal-chip cal-ev" title="${escHtml(e.title||'')}" onclick="event.stopPropagation();openCalDay('${ds}')"><span class="cal-chip-name">📌 ${escHtml(e.title||'Event')}</span>${crewMini(e.assigned)}</div>`;
+      }
+      const o = it.data;
+      return `<div class="cal-chip" style="--c:${stageColor(o.status)}" title="${escHtml(o.park||'')}" onclick="event.stopPropagation();showBoardJob(${o.id},'calendar')"><span class="cal-chip-name">${escHtml(o.park||'—')}</span>${crewMini(o.assigned)}</div>`;
+    });
     const chips = chipEls.slice(0, 3).join('');
     const more = chipEls.length > 3 ? `<div class="cal-more">+${chipEls.length-3} more</div>` : '';
     cells += `<div class="${cls}" onclick="openCalDay('${ds}')"><div class="cal-dnum">${d}</div>${holHtml}${chips}${more}</div>`;
