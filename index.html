@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: fix-token-refresh-race -->
+<!-- build: perf-lazy-cards-cal-index -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3077,11 +3077,9 @@ function saveCalOrderLocal(){ try { localStorage.setItem('calOrder', JSON.string
 function calItemKey(type, id){ return (type === 'event' ? 'e' : 'j') + id; }
 // Legacy order entries were bare numeric job ids — treat a number as a job key.
 function normalizeOrderKey(k){ return (typeof k === 'number') ? ('j' + k) : String(k); }
-// Every item (event + job) on a day, in the saved manual order. Items not yet
+// Apply a day's saved manual order to a list of {type,id,data} items. Items not
 // placed fall to the bottom: events first (by title), then jobs (by park).
-function calDayItems(ds){
-  const items = calEventsOn(ds).map(e => ({ type:'event', id:e.id, data:e }))
-    .concat(boardJobs.filter(o => jobDates(o).includes(ds)).map(o => ({ type:'job', id:o.id, data:o })));
+function calOrderItems(ds, items){
   const order = (calOrder[ds] || []).map(normalizeOrderKey);
   const byKey = {}; items.forEach(it => { byKey[calItemKey(it.type, it.id)] = it; });
   const result = [];
@@ -3090,6 +3088,25 @@ function calDayItems(ds){
   const restEv = rest.filter(x => x.type === 'event').sort((a,b)=>(a.data.title||'').localeCompare(b.data.title||''));
   const restJob = rest.filter(x => x.type === 'job').sort((a,b)=>(a.data.park||'').localeCompare(b.data.park||''));
   return result.concat(restEv, restJob);
+}
+// A date→items index so a full-calendar render scans jobs/events once instead of
+// re-filtering every job for all ~744 day cells. Set during renderCalendar.
+let _calIndex = null;
+function buildCalIndex(){
+  const jobsByDate = {}, eventsByDate = {};
+  boardJobs.forEach(o => { jobDates(o).forEach(d => { (jobsByDate[d] || (jobsByDate[d] = [])).push(o); }); });
+  calEvents.forEach(e => { if (e && e.date) (eventsByDate[e.date] || (eventsByDate[e.date] = [])).push(e); });
+  return { jobsByDate, eventsByDate };
+}
+// Every item (event + job) on a day, in the saved manual order. Uses the render
+// index when one is active, otherwise computes directly (single-day callers).
+function calDayItems(ds){
+  let evs, jobs;
+  if (_calIndex) { evs = _calIndex.eventsByDate[ds] || []; jobs = _calIndex.jobsByDate[ds] || []; }
+  else { evs = calEvents.filter(e => (e.date||'') === ds); jobs = boardJobs.filter(o => jobDates(o).includes(ds)); }
+  const items = evs.map(e => ({ type:'event', id:e.id, data:e }))
+    .concat(jobs.map(o => ({ type:'job', id:o.id, data:o })));
+  return calOrderItems(ds, items);
 }
 async function saveCalOrderToCloud(ds, ids){
   try {
@@ -3415,12 +3432,15 @@ function renderCalendar() {
   let sy = now.getFullYear(), sm = now.getMonth() - 6;
   while (sm < 0) { sm += 12; sy--; }
   let html = '';
-  for (let k = 0; k < 24; k++) {
-    const mi = sm + k;
-    const yy = sy + Math.floor(mi / 12);
-    const mm = ((mi % 12) + 12) % 12;
-    html += calMonthBlock(yy, mm, todayStr);
-  }
+  _calIndex = buildCalIndex();           // one pass over jobs/events for the whole render
+  try {
+    for (let k = 0; k < 24; k++) {
+      const mi = sm + k;
+      const yy = sy + Math.floor(mi / 12);
+      const mm = ((mi % 12) + 12) % 12;
+      html += calMonthBlock(yy, mm, todayStr);
+    }
+  } finally { _calIndex = null; }
   el.innerHTML = html;
   el.scrollTop = prevScroll; // keep position across background re-renders
   calUpdateStickyTitle();
@@ -3444,7 +3464,7 @@ function boardCardHtml(o) {
     ${(()=>{const ds=jobShownDates(o);return ds.length?`<div class="board-card-meta"><span class="board-sched">📅 ${fmtDate(ds[0])}${ds.length>1?` +${ds.length-1} more`:''}</span></div>`:'';})()}
     ${crewAvatars(o.assigned)}
     ${tagHtml?`<div class="board-card-tagrow">${tagHtml}</div>`:''}
-    ${boardDetailHtml(o)}
+    ${expandedBoardId===o.id ? boardDetailHtml(o) : ''}
   </div>`;
 }
 
@@ -3484,7 +3504,7 @@ function fileMeta(a) {
 function renderAtt(o, a, editable) {
   const isImg = a.type && a.type.indexOf('image/') === 0;
   const del = editable ? `<button class="att-del" onclick="deleteAttachment(${o.id},${a.id})">×</button>` : '';
-  if (isImg) return `<div class="att"><img src="${a.dataUrl}" onclick="openAttachment(${o.id},${a.id})"/>${del}</div>`;
+  if (isImg) return `<div class="att"><img src="${a.dataUrl}" loading="lazy" decoding="async" onclick="openAttachment(${o.id},${a.id})"/>${del}</div>`;
   const m = fileMeta(a);
   return `<div class="att att-file" style="--fc:${m.color}"><span class="att-file-badge">${m.label}</span><span class="att-file-main" onclick="openAttachment(${o.id},${a.id})"><span class="att-name">${escHtml(a.name)}</span><span class="att-file-sub">${m.kind}</span></span>${del}</div>`;
 }
@@ -3816,7 +3836,7 @@ function boardDetailHtml(o) {
   if (atts.length) {
     const chips = atts.map(a => {
       const isImg = a.type && a.type.indexOf('image/') === 0;
-      if (isImg) return `<button type="button" class="att-chip" title="${escHtml(a.name||'')}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})"><img src="${a.dataUrl}" alt="" style="width:100%;height:100%;object-fit:cover"/></button>`;
+      if (isImg) return `<button type="button" class="att-chip" title="${escHtml(a.name||'')}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})"><img src="${a.dataUrl}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover"/></button>`;
       const m = fileMeta(a);
       return `<button type="button" class="att-chip att-chip-file" title="${escHtml(a.name||'')}" style="--fc:${m.color}" onclick="event.stopPropagation();openAttachment(${o.id}, ${a.id})"><span class="att-chip-lbl">${m.label}</span></button>`;
     }).join('');
