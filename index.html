@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: resilient-load-retry -->
+<!-- build: lazy-photos-fix-timeout -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2938,7 +2938,15 @@ function avatarFor(name) {
 }
 
 // ── Board persistence (separate `board_jobs` table + localStorage cache) ──
-function saveBoardJobsLocal(){ try { localStorage.setItem('boardJobs', JSON.stringify(boardJobs)); } catch(e){} }
+// Cache the board locally WITHOUT photos — attachments are large and live in the
+// cloud; keeping them out of localStorage keeps the cache small and quick to load
+// (and avoids blowing the storage quota). Photos reload per job when opened.
+function saveBoardJobsLocal(){
+  try {
+    const light = boardJobs.map(j => { const c = Object.assign({}, j); c.attachments = []; c.attLoaded = false; return c; });
+    localStorage.setItem('boardJobs', JSON.stringify(light));
+  } catch(e){}
+}
 
 // Contact name/phone/email are packed into the existing `contact` column as JSON,
 // so no new database columns are required.
@@ -2979,16 +2987,21 @@ function jobIsComplete(o){ return normalizeStage(o.status) === 'Complete — Rea
 function jobShownDates(o){ return jobIsComplete(o) ? [] : jobDates(o); }
 function jobToRow(j){
   const ds = jobDates(j);
-  return { id:j.id, park:j.park, type:j.type, stage:j.status,
+  const row = { id:j.id, park:j.park, type:j.type, stage:j.status,
     // The board_jobs.technician column now holds the assigned crew (CSV), so
     // assignees sync without needing a new database column.
     technician: jobAssigned(j).join(',') || null,
     location:j.spaceLocation, description:j.description, amount:j.total,
     status_tag:j.statusTag, contact:packContact(j), notes:j.otherNotes,
-    checklist:j.checklist, attachments:j.attachments || [],
+    checklist:j.checklist,
     // Pack ALL days into scheduled_date (comma-separated) so multi-day jobs
     // survive even if the newer scheduled_dates column was never added.
     scheduled_date: ds.join(',') || null, scheduled_dates: ds };
+  // Only write photos when this job's photos are actually loaded — otherwise
+  // omit the column so saving other fields can't wipe the cloud's photos (an
+  // UPSERT leaves columns it doesn't send untouched).
+  if (j.attLoaded) row.attachments = j.attachments || [];
+  return row;
 }
 function rowToJob(r){
   const csv = String(r.scheduled_date || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -3005,21 +3018,33 @@ function rowToJob(r){
     // comma-separated scheduled_date so every day comes back.
     scheduledDates: (Array.isArray(r.scheduled_dates) && r.scheduled_dates.length) ? r.scheduled_dates : csv,
     checklist:Array.isArray(r.checklist)?r.checklist:[],
-    attachments:Array.isArray(r.attachments)?r.attachments:[] };
+    attachments:Array.isArray(r.attachments)?r.attachments:[],
+    // Photos are heavy, so the board loads WITHOUT them; they're fetched per job
+    // when a job is opened. attLoaded = have this job's photos been pulled yet.
+    attLoaded: Array.isArray(r.attachments) };
   normalizeJobDates(o);
   return o;
 }
 
+// Columns loaded for the board — everything EXCEPT the heavy `attachments`
+// (photos), which are fetched per job on demand. Pulling every job's photos at
+// once was timing out the database (statement timeout) and leaving the board
+// blank. (scheduled_dates is intentionally omitted — that column may not exist.)
+const BOARD_COLS = 'id,park,type,stage,technician,location,description,amount,status_tag,contact,notes,checklist,scheduled_date,created_at';
 async function loadBoardJobsFromCloud(){
   let ok = false;
+  // Keep any photos already pulled this session so reopening a job is instant.
+  const prevAtt = {};
+  boardJobs.forEach(j => { if (j.attLoaded) prevAtt[j.id] = j.attachments || []; });
   // Retry a few times before giving up — weak cell signal often fails the first
   // request but succeeds a moment later, which was leaving the board blank.
   for (let attempt = 0; attempt < 3 && !ok; attempt++) {
     if (attempt) await new Promise(r => setTimeout(r, 700 * attempt));
     try {
-      const rows = await sbFetch('board_jobs?order=created_at.desc');
+      const rows = await sbFetch('board_jobs?select=' + BOARD_COLS + '&order=created_at.desc');
       if (rows && rows.length !== undefined) {
         boardJobs = rows.map(rowToJob);
+        boardJobs.forEach(j => { if (prevAtt[j.id]) { j.attachments = prevAtt[j.id]; j.attLoaded = true; } });
         saveBoardJobsLocal();
         ok = true;
       }
@@ -3033,6 +3058,19 @@ async function loadBoardJobsFromCloud(){
   if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
   updateBoardCount();
+}
+// Fetch one job's photos on demand (when its card/full view is opened). The
+// board itself loads without photos to stay fast and avoid server timeouts.
+async function ensureJobAttachments(id){
+  const o = boardJobs.find(x => x.id === id);
+  if (!o || o.attLoaded) return;
+  try {
+    const rows = await sbFetch('board_jobs?id=eq.' + id + '&select=attachments');
+    if (rows && rows[0]) {
+      o.attachments = Array.isArray(rows[0].attachments) ? rows[0].attachments : [];
+      o.attLoaded = true;
+    }
+  } catch(e){ console.error('ensureJobAttachments failed:', e); }
 }
 // Retry the cloud load (from the "couldn't load" state on the board).
 async function retryCloudLoad(){
@@ -3558,6 +3596,8 @@ function attachmentsHtml(o, editable) {
   });
   if (editable) {
     h += attAdderHtml('job', o.id);
+  } else if (!atts.length && !o.attLoaded) {
+    h += `<div class="att-empty">Loading photos…</div>`;
   } else if (!atts.length) {
     h += `<div class="att-empty">${isViewer() ? 'No attachments.' : 'No attachments yet. Tap Edit to add.'}</div>`;
   }
@@ -3636,6 +3676,7 @@ async function attachFilesToJob(files, id) {
   if (!Array.isArray(o.attachments)) o.attachments = [];
   let n = 0;
   for (let k = 0; k < files.length; k++) { const att = await fileToAttachment(files[k], autoCat(files[k]), k); if (att) { o.attachments.push(att); n++; } }
+  o.attLoaded = true;
   persistBoardJob(o);
   refreshBoardViews();
   if (n) toast(n === 1 ? '✓ Attachment added' : '✓ ' + n + ' attachments added');
@@ -3666,6 +3707,7 @@ async function handleAttachmentPick(ev, id, category) {
     const att = await fileToAttachment(files[k], category, k);
     if (att) { o.attachments.push(att); n++; }
   }
+  o.attLoaded = true;
   persistBoardJob(o);
   refreshBoardViews();
   ev.target.value = '';
@@ -3694,6 +3736,7 @@ function deleteAttachment(jobId, attId) {
   if (!o || !Array.isArray(o.attachments)) return;
   if (!confirm('Delete this attachment?')) return;
   o.attachments = o.attachments.filter(a => a.id !== attId);
+  o.attLoaded = true;
   persistBoardJob(o);
   refreshBoardViews();
 }
@@ -3883,7 +3926,10 @@ function toggleBoardCard(id) {
   const opening = expandedBoardId !== id;
   expandedBoardId = expandedBoardId === id ? null : id;
   renderBoard();
-  if (opening) markJobSeen(id); // viewing the card clears its NEW tag for this device
+  if (opening) {
+    markJobSeen(id); // viewing the card clears its NEW tag for this device
+    ensureJobAttachments(id).then(() => { if (expandedBoardId === id) renderBoard(); }); // pull this job's photos
+  }
 }
 
 function renderBoard() {
@@ -3984,6 +4030,7 @@ function showBoardJob(id, from) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-boardjob').classList.add('active');
   renderBoardJob(id);
+  ensureJobAttachments(id).then(() => { if (currentBoardJobId === id) renderBoardJob(id); }); // pull this job's photos
 }
 function backFromBoardJob() { if (boardJobOrigin === 'calendar') showCalendar(); else showBoard(); }
 function editBoardJob(id){ if (isViewer()) return; boardJobEditMode = true; renderBoardJob(id); }
@@ -4582,7 +4629,7 @@ function saveNewJob() {
     id: Date.now(), date: dateStr, by, park, assigned: [],
     spaceLocation: document.getElementById('nj-space').value,
     description: document.getElementById('nj-desc').value,
-    status: stage, type: njType, checklist: [], attachments: njAttachments.slice(),
+    status: stage, type: njType, checklist: [], attachments: njAttachments.slice(), attLoaded: true,
     scheduledDate: njSchedVal, scheduledDates: njSchedVal ? [njSchedVal] : [],
     statusTag: document.getElementById('nj-tag').value.trim(),
     contact: document.getElementById('nj-contact').value.trim(),
