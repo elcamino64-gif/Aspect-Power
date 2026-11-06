@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: event-crew-unified-order -->
+<!-- build: fix-token-refresh-race -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -837,25 +837,45 @@ async function signIn(email, password){
   saveAuthSession();
 }
 
-async function refreshSession(){
-  if (!authSession || !authSession.refresh_token) return false;
-  try {
-    const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: authSession.refresh_token })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.access_token) return false;
-    authSession = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: Date.now() + ((data.expires_in || 3600) * 1000),
-      email: authSession.email
-    };
-    saveAuthSession();
-    return true;
-  } catch(e){ return false; }
+// Set true only when a refresh is rejected because the refresh token itself is
+// dead (a real expiry → re-login). Network blips / server errors leave it false
+// so we keep the cached session instead of bouncing to the login screen.
+let authHardExpired = false;
+// Single-flight: concurrent callers share ONE refresh. Supabase rotates refresh
+// tokens, so two refreshes at once would invalidate each other (this was causing
+// the board to intermittently drop to the login screen on open).
+let _refreshInFlight = null;
+function refreshSession(){
+  if (_refreshInFlight) return _refreshInFlight;
+  _refreshInFlight = (async () => {
+    if (!authSession || !authSession.refresh_token) return false;
+    const rt = authSession.refresh_token;
+    try {
+      const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: rt })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.access_token) {
+        // 400/401 → the refresh token was rejected (truly expired/invalid).
+        // Anything else (5xx, offline) is transient; keep the session.
+        if (res.status === 400 || res.status === 401) authHardExpired = true;
+        return false;
+      }
+      authHardExpired = false;
+      authSession = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + ((data.expires_in || 3600) * 1000),
+        email: authSession.email
+      };
+      saveAuthSession();
+      return true;
+    } catch(e){ return false; } // network error → transient, not a hard expiry
+  })();
+  _refreshInFlight.finally(() => { _refreshInFlight = null; }); // clear once settled so the next refresh can run
+  return _refreshInFlight;
 }
 
 // Refresh the token if it is missing or within 5 minutes of expiring.
@@ -4604,7 +4624,10 @@ function initApp() {
   // first paint is instant and the data fills in / updates a moment later.
   (async () => {
     const ok = await ensureFreshToken();
-    if (!ok && authSession) { showLogin(); return; } // session expired — re-auth
+    // Only drop to the login screen when the refresh token is genuinely dead.
+    // A transient failure (offline, server blip) keeps the cached board on
+    // screen; sbFetch will refresh-and-retry on the next request.
+    if (!ok && authHardExpired) { showLogin(); return; }
     loadCloudData();
     await loadPropertyInfoFromCloud();
     await loadBoardJobsFromCloud();
