@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: perf-lazy-cards-cal-index -->
+<!-- build: resilient-load-retry -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2713,6 +2713,7 @@ try { boardJobs = JSON.parse(localStorage.getItem('boardJobs') || '[]'); } catch
 // Becomes true once the first cloud load finishes (success or failure), so an
 // empty board can tell "still loading" apart from "genuinely no jobs".
 let boardLoaded = false;
+let boardLoadFailed = false; // true when the last cloud load failed (vs. genuinely empty)
 let boardFilter = 'all';
 
 // ── "NEW / status changed" markers (per DEVICE) ─────────────────────────────
@@ -3011,21 +3012,38 @@ function rowToJob(r){
 
 async function loadBoardJobsFromCloud(){
   let ok = false;
-  try {
-    const rows = await sbFetch('board_jobs?order=created_at.desc');
-    if (rows && rows.length !== undefined) {
-      boardJobs = rows.map(rowToJob);
-      saveBoardJobsLocal();
-      ok = true;
+  // Retry a few times before giving up — weak cell signal often fails the first
+  // request but succeeds a moment later, which was leaving the board blank.
+  for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, 700 * attempt));
+    try {
+      const rows = await sbFetch('board_jobs?order=created_at.desc');
+      if (rows && rows.length !== undefined) {
+        boardJobs = rows.map(rowToJob);
+        saveBoardJobsLocal();
+        ok = true;
+      }
+    } catch(e) {
+      console.error('loadBoardJobsFromCloud attempt ' + (attempt+1) + ' failed:', e);
     }
-  } catch(e) {
-    console.error('loadBoardJobsFromCloud failed (using local board):', e);
   }
   boardLoaded = true;
+  boardLoadFailed = !ok; // distinguishes "couldn't load" from "genuinely empty"
   ensureSeenBaseline(ok);
   if (document.getElementById('screen-board').classList.contains('active')) renderBoard();
   if (document.getElementById('screen-calendar').classList.contains('active')) renderCalendar();
   updateBoardCount();
+}
+// Retry the cloud load (from the "couldn't load" state on the board).
+async function retryCloudLoad(){
+  boardLoaded = false;
+  if (document.getElementById('screen-board').classList.contains('active')) renderBoard(); // show "Loading…"
+  await ensureFreshToken();
+  loadCloudData();
+  await loadPropertyInfoFromCloud();
+  await loadBoardJobsFromCloud();
+  await loadCalEventsFromCloud();
+  await loadCalOrderFromCloud();
 }
 
 async function saveBoardJobToCloud(job){
@@ -3880,6 +3898,9 @@ function renderBoard() {
     let msg;
     if (!boardLoaded && !boardJobs.length) {
       msg = `<div class="board-loading">Loading your jobs…</div>`;
+    } else if (!boardJobs.length && boardLoadFailed) {
+      // Load failed and there's no local copy — don't imply the jobs are gone.
+      msg = `<div class="board-blank"><div class="board-blank-emoji">📡</div><div class="board-blank-title">Couldn't load your jobs</div><div class="board-blank-sub">Your jobs are safe — this device just couldn't reach the server (check your signal).</div><button class="btn-primary" style="margin-top:16px;max-width:200px" onclick="retryCloudLoad()">↻ Try again</button></div>`;
     } else if (!boardJobs.length) {
       msg = `<div class="board-blank"><div class="board-blank-emoji">🗂️</div><div class="board-blank-title">No jobs yet</div><div class="board-blank-sub">${isViewer() ? 'Jobs will appear here once they\'re added.' : 'Tap <b>+ New Job</b> below to add your first one.'}</div></div>`;
     } else {
