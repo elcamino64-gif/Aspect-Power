@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: lazy-photos-fix-timeout -->
+<!-- build: protect-unsynced-jobs -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2715,6 +2715,13 @@ try { boardJobs = JSON.parse(localStorage.getItem('boardJobs') || '[]'); } catch
 let boardLoaded = false;
 let boardLoadFailed = false; // true when the last cloud load failed (vs. genuinely empty)
 let boardFilter = 'all';
+// Ids of jobs confirmed saved to the cloud. Lets a reload tell a never-synced
+// local job (keep it + re-upload) from one deleted elsewhere (let it go) — so a
+// job that hasn't reached the cloud is never silently wiped by a refresh.
+let syncedBoardJobIds = new Set();
+try { syncedBoardJobIds = new Set((JSON.parse(localStorage.getItem('syncedBoardJobIds') || '[]')).map(String)); } catch(e){}
+function saveSyncedBoardJobIds(){ try { localStorage.setItem('syncedBoardJobIds', JSON.stringify([...syncedBoardJobIds])); } catch(e){} }
+function markBoardJobSynced(id){ if (id==null) return; syncedBoardJobIds.add(String(id)); saveSyncedBoardJobIds(); }
 
 // ── "NEW / status changed" markers (per DEVICE) ─────────────────────────────
 // There is no login, so each phone tracks its own "seen" state. Every device
@@ -3043,9 +3050,18 @@ async function loadBoardJobsFromCloud(){
     try {
       const rows = await sbFetch('board_jobs?select=' + BOARD_COLS + '&order=created_at.desc');
       if (rows && rows.length !== undefined) {
-        boardJobs = rows.map(rowToJob);
+        const cloud = rows.map(rowToJob);
+        const cloudIds = new Set(cloud.map(j => String(j.id)));
+        cloud.forEach(j => markBoardJobSynced(j.id));
+        // Keep local jobs the cloud doesn't have ONLY if they were never synced
+        // (a synced-but-absent job was deleted elsewhere, so let it go). This
+        // protects a job that hasn't reached the cloud from being wiped, and
+        // re-uploads it so it syncs everywhere.
+        const localOnly = boardJobs.filter(j => !cloudIds.has(String(j.id)) && !syncedBoardJobIds.has(String(j.id)));
+        boardJobs = cloud.concat(localOnly);
         boardJobs.forEach(j => { if (prevAtt[j.id]) { j.attachments = prevAtt[j.id]; j.attLoaded = true; } });
         saveBoardJobsLocal();
+        localOnly.forEach(j => saveBoardJobToCloud(j)); // push the never-synced ones up
         ok = true;
       }
     } catch(e) {
@@ -3100,7 +3116,8 @@ async function saveBoardJobToCloud(job){
     const a4 = { ...a3 }; delete a4.attachments;
     let res;
     for (const payload of [full, a2, a3, a4]) { res = await post(payload); if (res.ok) break; }
-    if (!res.ok) console.warn('saveBoardJobToCloud failed (saved locally):', res.status, await res.text());
+    if (res.ok) markBoardJobSynced(job.id);
+    else console.warn('saveBoardJobToCloud failed (saved locally):', res.status, await res.text());
   } catch(e) { console.error('saveBoardJobToCloud network error (saved locally):', e); }
 }
 async function deleteBoardJobFromCloud(id){
