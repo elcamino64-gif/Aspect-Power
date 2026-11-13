@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- build: attachments-to-storage -->
+<!-- build: inapp-date-picker -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -91,6 +91,22 @@ textarea{resize:vertical;line-height:1.6}
 /* Modal */
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal-box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+/* In-app date picker */
+.dp-box{max-width:340px}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dp-title{font-size:16px;font-weight:700;color:#1d1d1f}
+.dp-nav{width:38px;height:38px;border:1px solid #d2d2d7;background:#f5f5f7;color:#2e97f2;font-size:20px;line-height:1;border-radius:10px;cursor:pointer;font-family:inherit}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dp-wd{text-align:center;font-size:11px;font-weight:700;color:#86868b;padding:4px 0}
+.dp-day{aspect-ratio:1;min-height:40px;border:none;background:#f5f5f7;color:#1d1d1f;font-size:16px;font-weight:600;border-radius:10px;cursor:pointer;font-family:inherit}
+.dp-day:active{background:#e5e5ea}
+.dp-day.dp-empty{background:transparent;cursor:default}
+.dp-day.dp-today{box-shadow:inset 0 0 0 2px #2e97f2;color:#2e97f2}
+.dp-day.dp-sel{background:#2e97f2;color:#fff}
+.jd-addbtn{border:1.5px dashed #2e97f2;background:transparent;color:#2e97f2;font-size:15px;font-weight:600;padding:10px 16px;border-radius:11px;cursor:pointer;font-family:inherit}
+.jd-chip-date{border:none;background:#eef6ff;color:#1d6fe0;font-size:14px;font-weight:600;padding:7px 11px;border-radius:8px;cursor:pointer;font-family:inherit}
+.form-datebtn{display:block;width:100%;text-align:left;border:1px solid #d2d2d7;background:#fff;color:#1d1d1f;font-size:16px;padding:12px 14px;border-radius:12px;cursor:pointer;font-family:inherit}
+.form-datebtn.empty{color:#a0a0a5}
 .modal-title{font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:16px}
 .modal-input{width:100%;border:1px solid #d2d2d7;border-radius:10px;padding:12px 14px;font-size:15px;outline:none;margin-bottom:8px;box-sizing:border-box}
 .modal-input:focus{border-color:#2e97f2}
@@ -433,7 +449,7 @@ body.viewer .viewer-hide{display:none !important}
     <div class="section">
       <div class="section-title">Job Info</div>
       <div style="display:flex;flex-direction:column;gap:12px">
-        <div><label class="field-label">Date</label><input type="date" id="f-date"/></div>
+        <div><label class="field-label">Date</label><button type="button" id="f-date-btn" class="form-datebtn empty" onclick="fPickDate()">Pick a date</button><input type="hidden" id="f-date"/></div>
         <div>
           <label class="field-label">Technician</label>
           <div style="display:flex;gap:8px">
@@ -658,7 +674,8 @@ body.viewer .viewer-hide{display:none !important}
       <select id="nj-stage"></select>
 
       <label class="fl">Scheduled</label>
-      <input type="date" id="nj-sched" class="form-dateinput"/>
+      <button type="button" id="nj-sched-btn" class="form-datebtn empty" onclick="njPickDate()">Pick a date</button>
+      <input type="hidden" id="nj-sched"/>
 
       <label class="fl">Park / Property</label>
       <div class="prop-row">
@@ -742,6 +759,19 @@ body.viewer .viewer-hide{display:none !important}
       <button class="modal-btn-cancel" onclick="closeAssignPrompt()">Skip</button>
       <button class="modal-btn-confirm" onclick="closeAssignPrompt()">Done</button>
     </div>
+  </div>
+</div>
+
+<!-- In-app date picker (replaces the native iOS date input for scheduling) -->
+<div class="modal-overlay" id="datepick-overlay" style="display:none" onclick="if(event.target===this)closeDatePicker()">
+  <div class="modal-box dp-box">
+    <div class="dp-head">
+      <button type="button" class="dp-nav" onclick="dpShiftMonth(-1)">‹</button>
+      <div class="dp-title" id="dp-title"></div>
+      <button type="button" class="dp-nav" onclick="dpShiftMonth(1)">›</button>
+    </div>
+    <div id="dp-body"></div>
+    <button type="button" class="modal-btn-cancel" style="width:100%;margin-top:12px" onclick="closeDatePicker()">Cancel</button>
   </div>
 </div>
 
@@ -2145,7 +2175,7 @@ function editOrder(id) {
   if (o.by && bySel && ![...bySel.options].some(op => op.value === o.by)) {
     bySel.insertAdjacentHTML('beforeend', `<option value="${o.by}">${o.by}</option>`);
   }
-  document.getElementById('f-date').value = o.date || '';
+  setFDate(o.date || '');
   bySel.value = o.by || '';
   parkSel.value = o.park || '';
   document.getElementById('f-space').value = o.spaceLocation || '';
@@ -2175,7 +2205,7 @@ function newOrder() {
 }
 
 function resetForm() {
-  document.getElementById('f-date').value = '';
+  setFDate('');
   document.getElementById('f-by').value = '';
   document.getElementById('f-park').value = '';
   const mileageRefEl = document.getElementById('mileage-ref');
@@ -4054,7 +4084,7 @@ function toggleBoardCard(id) {
   renderBoard();
   if (opening) {
     markJobSeen(id); // viewing the card clears its NEW tag for this device
-    ensureJobAttachments(id).then(() => { if (expandedBoardId === id) renderBoard(); }); // pull this job's photos
+    ensureJobAttachments(id).then(() => { if (expandedBoardId === id && !screenHasFocusedField('screen-board')) renderBoard(); }); // pull this job's photos
   }
 }
 
@@ -4156,7 +4186,7 @@ function showBoardJob(id, from) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-boardjob').classList.add('active');
   renderBoardJob(id);
-  ensureJobAttachments(id).then(() => { if (currentBoardJobId === id) renderBoardJob(id); }); // pull this job's photos
+  ensureJobAttachments(id).then(() => { if (currentBoardJobId === id && !screenHasFocusedField('screen-boardjob')) renderBoardJob(id); }); // pull this job's photos
 }
 function backFromBoardJob() { if (boardJobOrigin === 'calendar') showCalendar(); else showBoard(); }
 function editBoardJob(id){ if (isViewer()) return; boardJobEditMode = true; renderBoardJob(id); }
@@ -4309,21 +4339,60 @@ function editBoardJobField(id, field, value) {
 }
 // Multi-date scheduling control. Uses VISIBLE native date inputs, which open
 // the picker reliably on iPhone (an invisible/opacity:0 date input often won't).
+// ── In-app date picker (replaces the native iOS date input) ───────────────
+let _dpCallback = null, _dpMonth = null, _dpSelected = '';
+function openDatePicker(initial, cb){
+  _dpCallback = cb;
+  _dpSelected = initial || '';
+  const base = initial ? new Date(initial + 'T12:00:00') : new Date();
+  _dpMonth = new Date(base.getFullYear(), base.getMonth(), 1);
+  dpRender();
+  document.getElementById('datepick-overlay').style.display = 'flex';
+}
+function closeDatePicker(){ document.getElementById('datepick-overlay').style.display = 'none'; _dpCallback = null; }
+function dpShiftMonth(n){ _dpMonth = new Date(_dpMonth.getFullYear(), _dpMonth.getMonth() + n, 1); dpRender(); }
+function dpRender(){
+  const y = _dpMonth.getFullYear(), m = _dpMonth.getMonth();
+  document.getElementById('dp-title').textContent = CAL_MONTHS[m] + ' ' + y;
+  const todayStr = ymd(new Date());
+  const startPad = new Date(y, m, 1).getDay();
+  const days = new Date(y, m+1, 0).getDate();
+  let cells = CAL_WD.map(w => `<div class="dp-wd">${w}</div>`).join('');
+  for (let i = 0; i < startPad; i++) cells += `<div class="dp-day dp-empty"></div>`;
+  for (let d = 1; d <= days; d++){
+    const dsv = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const cls = 'dp-day' + (dsv === todayStr ? ' dp-today' : '') + (dsv === _dpSelected ? ' dp-sel' : '');
+    cells += `<button type="button" class="${cls}" onclick="dpPick('${dsv}')">${d}</button>`;
+  }
+  document.getElementById('dp-body').innerHTML = `<div class="dp-grid">${cells}</div>`;
+}
+function dpPick(ds){
+  const cb = _dpCallback;
+  closeDatePicker();
+  if (typeof cb === 'function') cb(ds);
+}
+// Work Order date field (button + hidden input) using the in-app picker.
+function setFDate(d){
+  const h = document.getElementById('f-date'); if (h) h.value = d || '';
+  const b = document.getElementById('f-date-btn');
+  if (b){ if (d){ b.textContent = fmtDate(d); b.classList.remove('empty'); } else { b.textContent = 'Pick a date'; b.classList.add('empty'); } }
+}
+function fPickDate(){ openDatePicker((document.getElementById('f-date')||{}).value || '', setFDate); }
+
 function jobDatesControl(o) {
   const ds = jobDates(o);
   if (isViewer()) {
     if (!ds.length) return `<span class="muted" style="color:#86868b">Not scheduled</span>`;
     return `<div class="jd-wrap">${ds.map(d => `<span class="jd-chip-ro">${fmtDate(d)}</span>`).join('')}</div>`;
   }
-  // A full-width native date field for adding a day — picks a date, then resets.
-  const addInput = `<input type="date" class="form-dateinput" aria-label="Add a scheduled day" onchange="if(this.value){addJobScheduledDate(${o.id},this.value); this.value='';}"/>`;
+  const addBtn = `<button type="button" class="jd-addbtn" onclick="openDatePicker('', function(d){addJobScheduledDate(${o.id}, d);})">＋ Add a day</button>`;
   if (!ds.length) {
-    return `<div class="jd-addwrap"><span class="jd-addlabel">Pick a date:</span>${addInput}</div>`;
+    return `<div class="jd-addwrap">${addBtn}</div>`;
   }
   const chips = ds.map(d =>
-    `<span class="jd-chip"><input type="date" class="jd-dateinput" value="${d}" onchange="if(this.value)changeJobDate(${o.id},'${d}',this.value)"/><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
+    `<span class="jd-chip"><button type="button" class="jd-chip-date" onclick="openDatePicker('${d}', function(nd){changeJobDate(${o.id},'${d}',nd);})">${fmtDate(d)}</button><button type="button" title="Remove this day" onclick="removeJobDate(${o.id},'${d}')">✕</button></span>`
   ).join('');
-  return `<div class="jd-wrap">${chips}</div><div class="jd-addwrap"><span class="jd-addlabel">Add another day:</span>${addInput}</div><div class="jd-hint">Tap a date to change it · ✕ to remove</div>`;
+  return `<div class="jd-wrap">${chips}</div><div class="jd-addwrap">${addBtn}</div><div class="jd-hint">Tap a date to change it · ✕ to remove</div>`;
 }
 // Set a job's scheduled days explicitly. Unlike normalizeJobDates(), this does
 // NOT fall back to the legacy single date — so clearing to empty really clears
@@ -4394,12 +4463,20 @@ function saveBoardJobDone(id) {
 }
 
 // Re-render whichever board view is on screen (board or full job detail)
+// True while the person is actively in a field inside a screen (e.g. the date
+// picker is open). A background re-render then would destroy that control — on
+// iOS that closes the date picker and commits today — so we skip it.
+function screenHasFocusedField(screenId){
+  const s = document.getElementById(screenId);
+  const ae = document.activeElement;
+  return !!(s && ae && s.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName));
+}
 function refreshBoardViews() {
   const b = document.getElementById('screen-board');
   const d = document.getElementById('screen-boardjob');
   const c = document.getElementById('screen-calendar');
   if (b && b.classList.contains('active')) renderBoard();
-  if (d && d.classList.contains('active') && currentBoardJobId != null) renderBoardJob(currentBoardJobId);
+  if (d && d.classList.contains('active') && currentBoardJobId != null && !screenHasFocusedField('screen-boardjob')) renderBoardJob(currentBoardJobId);
   if (c && c.classList.contains('active')) renderCalendar();
 }
 
@@ -4504,9 +4581,19 @@ function openNewJob() {
   const njPark = document.getElementById('nj-park'); if (njPark) njPark.value = '';
   const njStage = document.getElementById('nj-stage'); if (njStage) njStage.value = 'Inquiries';
   njPropChange(); // resets the contact dropdown + address hint for the (empty) property
+  const njSb = document.getElementById('nj-sched-btn'); if (njSb) { njSb.textContent = 'Pick a date'; njSb.classList.add('empty'); }
   njAttachments = [];
   njRenderAttachments();
   document.getElementById('nj-overlay').classList.add('show');
+}
+// Open the in-app date picker for the New Job "Scheduled" field.
+function njPickDate(){
+  const cur = document.getElementById('nj-sched').value || '';
+  openDatePicker(cur, function(d){
+    document.getElementById('nj-sched').value = d;
+    const b = document.getElementById('nj-sched-btn');
+    if (b) { b.textContent = fmtDate(d); b.classList.remove('empty'); }
+  });
 }
 
 // New-job attachments held here until the job is saved
